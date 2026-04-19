@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install:*)",
+      "Bash(python -c \"import torch3d; print\\('PyTorch3D OK'\\)\")"
+    ]
+  }
+}

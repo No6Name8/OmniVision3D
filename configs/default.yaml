@@ -1,0 +1,47 @@
+# OmniVision3D default experiment configuration
+
+rendering:
+  # Number of evenly-spaced azimuth steps over [0, 360).
+  # 36 steps = one render every 10 degrees.
+  azimuth_steps: 36
+
+  # Elevation angles in degrees (negative = below equator, 90 = top-down).
+  elevation_levels:
+    - -30.0
+    - 0.0
+    - 30.0
+    - 60.0
+    - 90.0
+
+  # Camera distances from the object centre in scene units.
+  distances:
+    - 1.5
+    - 2.5
+    - 4.0
+
+  # Point-light positions [x, y, z] sampled across render batches.
+  # Varying lighting improves robustness to real-world illumination conditions.
+  lighting_variations:
+    - [ 0.0,  1.0, -1.0]   # above-front
+    - [ 1.0,  0.0, -1.0]   # side-front right
+    - [-1.0,  0.0, -1.0]   # side-front left
+    - [ 0.0, -1.0, -1.0]   # below-front
+    - [ 0.0,  0.0, -2.0]   # directly behind camera
+
+  # Render resolution in pixels (square).
+  # 512 is a good balance between detail and rendering speed.
+  image_size: 512
+
+  # Root directory where raw/ and processed/ sub-folders are written.
+  output_path: dataset
+
+training:
+  epochs: 30
+  batch_size: 32
+  learning_rate: 0.0003
+  # Directory where best.pt checkpoint is saved.
+  checkpoint_dir: checkpoints
+
+# Class names populated at training time from processed/ sub-folder names.
+# Override manually when running the API server standalone.
+classes: []
