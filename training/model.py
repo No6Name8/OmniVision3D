@@ -1,5 +1,5 @@
 """
-Recognition model architecture built on a pretrained ResNet-50 backbone.
+Recognition model built on a pretrained ResNet-50 backbone.
 
 The final fully-connected layer is replaced to match the number of object classes.
 An embed() method exposes penultimate-layer features for similarity search or

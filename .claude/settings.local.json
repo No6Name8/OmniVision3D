@@ -1,8 +1,19 @@
 {
   "permissions": {
     "allow": [
-      "Bash(pip install:*)",
-      "Bash(python -c \"import torch3d; print\\('PyTorch3D OK'\\)\")"
+      "Bash(python -c \"import pytorch3d; print\\('PyTorch3D OK:', pytorch3d.__version__\\)\")",
+      "Bash(pip show *)",
+      "Bash(pip install *)",
+      "Bash(where cl.exe)",
+      "Read(//c/Program Files \\(x86\\)/**)",
+      "Read(//c/Program Files/**)",
+      "Bash(python -m pytest tests/ -v)",
+      "Bash(python -c ' *)",
+      "Bash(python -m renderer.render_views --config configs/default.yaml --obj models/Shahed_136.obj)",
+      "Bash(python -m renderer.sky_compositor --input dataset/raw/Shahed_136/ --output dataset/processed/Shahed_136/ --backgrounds dataset/backgrounds/)",
+      "Bash(python -m pytest tests/test_renderer.py -v)",
+      "Bash(python -m renderer.thermal_filter --input dataset/processed/Shahed_136/ --output dataset/processed/Shahed_136_thermal/ --palette iron)",
+      "Bash(python -m renderer.render_views --config configs/default.yaml --obj \"models/Shahed 136 Drone.STEP\")"
     ]
   }
 }

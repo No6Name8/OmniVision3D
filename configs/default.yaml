@@ -1,23 +1,21 @@
 # OmniVision3D default experiment configuration
 
 rendering:
-  # Number of evenly-spaced azimuth steps over [0, 360).
-  # 36 steps = one render every 10 degrees.
-  azimuth_steps: 36
+  # Fibonacci sphere sampling: 100 points evenly distributed across the full
+  # sphere — front, rear, left, right, top-down, bottom-up, every diagonal.
+  # No clustering at poles. Each angle gets all 6 distances below.
+  # Total: 100 angles x 6 distances = 600 renders.
+  sphere_angles: 100
 
-  # Elevation angles in degrees (negative = below equator, 90 = top-down).
-  elevation_levels:
-    - -30.0
-    - 0.0
-    - 30.0
-    - 60.0
-    - 90.0
-
-  # Camera distances from the object centre in scene units.
+  # Six distances per angle: close through extreme long-range.
+  # Mesh is scaled per distance so apparent size changes realistically.
   distances:
-    - 1.5
-    - 2.5
-    - 4.0
+    - 2.0    # close
+    - 3.5    # medium
+    - 5.5    # mid-range
+    - 8.0    # long
+    - 12.0   # very far
+    - 18.0   # extreme far
 
   # Point-light positions [x, y, z] sampled across render batches.
   # Varying lighting improves robustness to real-world illumination conditions.
@@ -29,11 +27,19 @@ rendering:
     - [ 0.0,  0.0, -2.0]   # directly behind camera
 
   # Render resolution in pixels (square).
-  # 512 is a good balance between detail and rendering speed.
   image_size: 512
 
   # Root directory where raw/ and processed/ sub-folders are written.
   output_path: dataset
+
+  # Mesh formats accepted by the loader.
+  supported_formats:
+    - .obj
+    - .glb
+    - .stl
+    - .fbx
+    - .step
+    - .stp
 
 training:
   epochs: 30
@@ -41,6 +47,14 @@ training:
   learning_rate: 0.0003
   # Directory where best.pt checkpoint is saved.
   checkpoint_dir: checkpoints
+
+# Thermal imaging settings.
+thermal: false
+thermal_palettes:
+  - iron
+  - rainbow
+  - grayscale
+thermal_dataset: dataset/processed/Shahed_136_thermal
 
 # Class names populated at training time from processed/ sub-folder names.
 # Override manually when running the API server standalone.
