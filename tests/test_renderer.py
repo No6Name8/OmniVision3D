@@ -113,8 +113,8 @@ def test_viewpoint_to_camera_pole_fallback():
 # ---------------------------------------------------------------------------
 
 def _make_render(size: int = 64) -> np.ndarray:
-    """Black-background render with a grey square drone in the centre."""
-    img = np.zeros((size, size, 3), dtype=np.uint8)
+    """White-background render with a grey square drone in the centre."""
+    img = np.full((size, size, 3), 255, dtype=np.uint8)
     q = size // 4
     img[q:size - q, q:size - q] = 120  # grey object
     return img

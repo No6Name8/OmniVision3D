@@ -13,7 +13,13 @@
       "Bash(python -m renderer.sky_compositor --input dataset/raw/Shahed_136/ --output dataset/processed/Shahed_136/ --backgrounds dataset/backgrounds/)",
       "Bash(python -m pytest tests/test_renderer.py -v)",
       "Bash(python -m renderer.thermal_filter --input dataset/processed/Shahed_136/ --output dataset/processed/Shahed_136_thermal/ --palette iron)",
-      "Bash(python -m renderer.render_views --config configs/default.yaml --obj \"models/Shahed 136 Drone.STEP\")"
+      "Bash(python -m renderer.render_views --config configs/default.yaml --obj \"models/Shahed 136 Drone.STEP\")",
+      "Bash(python -m renderer.sky_compositor --input \"dataset/raw/Shahed 136 Drone/\" --output \"dataset/processed/Shahed 136 Drone/\" --backgrounds dataset/backgrounds/)",
+      "Bash(python -m renderer.thermal_filter --input \"dataset/processed/Shahed 136 Drone/\" --output \"dataset/processed/Shahed 136 Drone_thermal/\" --palette iron)",
+      "Bash(python -c \"import matplotlib; print\\(matplotlib.__version__\\)\")",
+      "Bash(mkdir -p checkpoints)",
+      "Bash(python training/train.py --config configs/default.yaml)",
+      "Bash(python -m training.train --config configs/default.yaml)"
     ]
   }
 }

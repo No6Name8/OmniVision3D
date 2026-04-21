@@ -44,7 +44,7 @@ rendering:
 training:
   epochs: 30
   batch_size: 32
-  learning_rate: 0.0003
+  learning_rate: 0.001
   # Directory where best.pt checkpoint is saved.
   checkpoint_dir: checkpoints
 
