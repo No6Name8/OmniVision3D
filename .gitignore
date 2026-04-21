@@ -18,16 +18,22 @@ env/
 .env
 .python-version
 
-# ── PyTorch checkpoints and weights ──────────────────────────────────────────
-checkpoints/
-*.pt
-*.pth
-*.ckpt
-*.safetensors
+# ── Dataset (7,200 generated images — never commit) ───────────────────────────
+dataset/
 
-# ── Dataset (generated — never commit raw renders) ───────────────────────────
-dataset/raw/
-dataset/processed/
+# ── Checkpoints — ignore large weights, KEEP onnx/csv/png ────────────────────
+checkpoints/*.pt
+checkpoints/*.pth
+checkpoints/*.ckpt
+checkpoints/*.safetensors
+# checkpoints/omnivision3d.onnx  — tracked (8.5 MB, needed for Pi deploy)
+# checkpoints/training_log.csv   — tracked (training history)
+# checkpoints/training_curve.png — tracked (training curve)
+
+# ── Runtime logs (generated at mission time — not source files) ───────────────
+pi_deploy/logs/*.log
+pi_deploy/logs/*.csv
+logs/
 
 # ── Jupyter ───────────────────────────────────────────────────────────────────
 .ipynb_checkpoints/
@@ -37,8 +43,6 @@ dataset/processed/
 runs/
 wandb/
 mlruns/
-*.log
-*.csv
 
 # ── OS ────────────────────────────────────────────────────────────────────────
 .DS_Store
@@ -57,3 +61,10 @@ ehthumbs.db
 *.swo
 *.suo
 *.user
+
+# ── Misc ──────────────────────────────────────────────────────────────────────
+=0*
+tests/test_images/
+tests/test_results/
+tests/test_video.mp4
+tests/test_video_result.mp4

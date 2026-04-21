@@ -1,0 +1,10 @@
+confidence_threshold: 0.85
+camera_index: 0
+frame_width: 640
+frame_height: 480
+inference_size: 224
+model_path: vision/omnivision3d.onnx
+log_dir: logs/
+scan_fps_target: 15
+lost_target_timeout: 2.0
+simulation_mode: true
