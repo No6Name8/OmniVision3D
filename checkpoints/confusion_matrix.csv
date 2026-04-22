@@ -1,3 +1,3 @@
-true \ pred,no_drone,drone
+true \ pred,no_drone,dji_mini_4_pro
 no_drone,360,0
-drone,0,360
+dji_mini_4_pro,0,360

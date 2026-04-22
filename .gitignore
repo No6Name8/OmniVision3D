@@ -38,6 +38,7 @@ logs/
 # ── Jupyter ───────────────────────────────────────────────────────────────────
 .ipynb_checkpoints/
 *.ipynb
+!colab_training.ipynb
 
 # ── Experiment tracking ───────────────────────────────────────────────────────
 runs/
@@ -68,3 +69,10 @@ tests/test_images/
 tests/test_results/
 tests/test_video.mp4
 tests/test_video_result.mp4
+yolo_dataset.zip
+yolov8n.pt
+# yolo_dataset images are excluded but dataset.yaml is tracked
+yolo_dataset/images/
+yolo_dataset/labels/
+yolo_dataset/sample_label_check.png
+yolo_dataset/sample_check.png

@@ -40,13 +40,13 @@ EVAL_TRANSFORM = transforms.Compose([
 # Maps every physical folder name to a binary label.
 # Add new drone variants here in the future without changing anything else.
 FOLDER_TO_LABEL: Dict[str, int] = {
-    "Shahed 136 Drone":          1,   # drone — RGB
-    "Shahed 136 Drone_thermal":  1,   # drone — thermal
-    "no_drone":                  0,   # background — RGB
-    "no_drone_thermal":          0,   # background — thermal
+    "DJI_Mini_4_Pro":          1,   # drone — RGB
+    "DJI_Mini_4_Pro_thermal":  1,   # drone — thermal
+    "no_drone":                0,   # background — RGB
+    "no_drone_thermal":        0,   # background — thermal
 }
 
-CLASS_NAMES = ["no_drone", "drone"]
+CLASS_NAMES = ["no_drone", "dji_mini_4_pro"]
 
 
 class SyntheticViewDataset(Dataset):

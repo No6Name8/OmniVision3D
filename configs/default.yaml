@@ -54,8 +54,8 @@ thermal_palettes:
   - iron
   - rainbow
   - grayscale
-thermal_dataset: dataset/processed/Shahed_136_thermal
+thermal_dataset: dataset/processed/DJI_Mini_4_Pro_thermal
 
 # Class names populated at training time from processed/ sub-folder names.
 # Override manually when running the API server standalone.
-classes: []
+classes: [no_drone, dji_mini_4_pro]
