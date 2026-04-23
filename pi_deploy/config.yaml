@@ -1,10 +1,32 @@
-confidence_threshold: 0.85
-camera_index: 0
-frame_width: 640
-frame_height: 480
-inference_size: 224
-model_path: vision/omnivision3d.onnx
-log_dir: logs/
-scan_fps_target: 15
-lost_target_timeout: 2.0
+yolo:
+  model_path: vision/yolo_dji.onnx
+  confidence_threshold: 0.50
+  nms_threshold: 0.45
+  input_size: 512
+
+identity_confirmation:
+  model_path: vision/omnivision3d.onnx
+  confidence_threshold: 0.85
+  consecutive_required: 3
+  reset_threshold: 0.50
+  crop_padding: 0.20
+
+tracking:
+  lost_searching_seconds: 3.0
+  lost_navigating_seconds: 10.0
+  pid_p: 0.1
+  pid_i: 0.01
+  pid_d: 0.05
+
+navigation:
+  home_lat: 24.7136
+  home_lon: 46.6753
+  altitude: 50
+  close_enough_meters: 50
+
+camera:
+  index: 0
+  width: 640
+  height: 480
+
 simulation_mode: true

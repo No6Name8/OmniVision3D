@@ -1,21 +1,22 @@
 """
-tracker.py — PID-based target tracker for OmniVision3D.
+tracker.py — State-machine target tracker for OmniVision3D.
 
-Takes a pixel offset (dx, dy) from the frame centre and returns normalised
-pitch and yaw corrections in [-1.0, 1.0].
+States:
+    LOCKED      : target visible, PID corrections active
+    SEARCHING   : target lost < 3s, hold last correction
+    NAVIGATING  : target lost 3–10s, fly to last known position
+    ABORT       : target lost > 10s, return to base
 
-Simulation mode: corrections are printed and logged; no hardware is touched.
-
-TODO (when flight controller is wired):
-    - Replace _send_correction() stub with MAVLink RC-override calls.
-    - Tune PID gains against real airframe response.
-    - Add roll axis if the gimbal supports it.
+TODO (MAVLink wiring):
+    Replace _send_correction() stub with RC_CHANNELS_OVERRIDE commands.
 """
 
 import logging
 import time
+from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
-from typing import Tuple
+from typing import Optional, Tuple
 
 _LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
 _LOG_DIR.mkdir(exist_ok=True)
@@ -26,12 +27,28 @@ logging.basicConfig(
 )
 
 
-class PIDController:
-    """Single-axis discrete PID controller."""
+class TrackState(str, Enum):
+    LOCKED     = "LOCKED"
+    SEARCHING  = "SEARCHING"
+    NAVIGATING = "NAVIGATING"
+    ABORT      = "ABORT"
 
+
+@dataclass
+class TrackingCommand:
+    state:              TrackState
+    pitch:              float = 0.0
+    yaw:                float = 0.0
+    dx:                 int   = 0
+    dy:                 int   = 0
+    lost_seconds:       float = 0.0
+    last_known_center:  Optional[Tuple[int, int]] = None
+
+
+class _PID:
     def __init__(self, kp: float, ki: float, kd: float) -> None:
         self.kp, self.ki, self.kd = kp, ki, kd
-        self._integral  = 0.0
+        self._integral   = 0.0
         self._prev_error = 0.0
         self._prev_time  = time.monotonic()
 
@@ -43,106 +60,130 @@ class PIDController:
     def update(self, error: float) -> float:
         now = time.monotonic()
         dt  = max(now - self._prev_time, 1e-4)
-
         self._integral  += error * dt
         derivative       = (error - self._prev_error) / dt
-        output           = self.kp * error + self.ki * self._integral + self.kd * derivative
-
+        out              = self.kp * error + self.ki * self._integral + self.kd * derivative
         self._prev_error = error
         self._prev_time  = now
-        return float(output)
+        return float(out)
 
 
-class TargetTracker:
+class Tracker:
     """
-    Converts frame-centre pixel offsets into pitch/yaw corrections.
-
-    Corrections are clamped to [-1.0, 1.0] where ±1.0 represents the
-    maximum command sent to the flight controller.
-
-    If the target is lost, the last valid correction is held for
-    `hold_duration` seconds before returning to (0.0, 0.0) scan state.
+    Converts PipelineResult into pitch/yaw corrections with loss-state handling.
     """
 
-    def __init__(
-        self,
-        kp: float = 0.1,
-        ki: float = 0.01,
-        kd: float = 0.05,
-        hold_duration: float = 1.0,
-        simulation: bool = True,
-    ) -> None:
-        self._pitch_pid = PIDController(kp, ki, kd)
-        self._yaw_pid   = PIDController(kp, ki, kd)
-        self._hold      = hold_duration
-        self._sim       = simulation
+    def __init__(self, config: dict) -> None:
+        tcfg = config["tracking"]
+        ccfg = config["camera"]
 
-        self._last_correction: Tuple[float, float] = (0.0, 0.0)
-        self._lost_since: float = 0.0
-        self._tracking  = False
+        self._frame_w  = ccfg["width"]
+        self._frame_h  = ccfg["height"]
+        self._t_search = tcfg["lost_searching_seconds"]
+        self._t_nav    = tcfg["lost_navigating_seconds"]
 
-    def update(
-        self,
-        offset: Tuple[float, float],
-        target_visible: bool,
-    ) -> Tuple[float, float]:
+        kp = tcfg["pid_p"]
+        ki = tcfg["pid_i"]
+        kd = tcfg["pid_d"]
+        self._pid_yaw   = _PID(kp, ki, kd)
+        self._pid_pitch = _PID(kp, ki, kd)
+
+        self._last_pitch: float = 0.0
+        self._last_yaw:   float = 0.0
+        self._last_center: Optional[Tuple[int, int]] = None
+        self._lost_since:  Optional[float] = None
+
+    # ------------------------------------------------------------------
+    def update(self, result) -> TrackingCommand:
         """
-        Compute pitch and yaw corrections.
+        Compute next tracking command from a PipelineResult.
 
         Args:
-            offset:         (dx, dy) pixels from frame centre.  dx>0 = target right.
-            target_visible: True when a drone detection exceeds the confidence threshold.
+            result: PipelineResult from VisionPipeline.process_frame()
 
         Returns:
-            (pitch, yaw) corrections in [-1.0, 1.0].
-            Positive pitch  = nose up.
-            Positive yaw    = nose right.
+            TrackingCommand with state, pitch, yaw, dx, dy.
         """
-        if target_visible:
-            dx, dy     = offset
-            yaw_out    = float(self._yaw_pid.update(dx))
-            pitch_out  = float(self._pitch_pid.update(-dy))  # dy>0 = target below → pitch down
+        from vision.pipeline import Phase
 
-            yaw_out   = max(-1.0, min(1.0, yaw_out))
-            pitch_out = max(-1.0, min(1.0, pitch_out))
+        if result.phase == Phase.LOCKED and result.detection is not None:
+            self._lost_since = None
+            self._pid_yaw.reset() if self._lost_since is not None else None
 
-            self._last_correction = (pitch_out, yaw_out)
-            self._lost_since      = 0.0
-            self._tracking        = True
+            cx, cy = result.detection.center
+            frame_cx = self._frame_w / 2.0
+            frame_cy = self._frame_h / 2.0
 
-            self._send_correction(pitch_out, yaw_out, "TRACKING")
-            return pitch_out, yaw_out
+            dx = int(cx - frame_cx)
+            dy = int(cy - frame_cy)
 
-        # Target lost
-        if self._tracking and self._lost_since == 0.0:
+            norm_dx = dx / (self._frame_w  / 2.0)
+            norm_dy = dy / (self._frame_h  / 2.0)
+
+            yaw   = float(self._pid_yaw.update(norm_dx))
+            pitch = float(self._pid_pitch.update(-norm_dy))
+
+            yaw   = max(-1.0, min(1.0, yaw))
+            pitch = max(-1.0, min(1.0, pitch))
+
+            self._last_pitch  = pitch
+            self._last_yaw    = yaw
+            self._last_center = result.detection.center
+
+            cmd = TrackingCommand(
+                state=TrackState.LOCKED,
+                pitch=pitch, yaw=yaw,
+                dx=dx, dy=dy,
+                last_known_center=self._last_center,
+            )
+            logging.info("LOCKED  pitch=%+.3f yaw=%+.3f dx=%d dy=%d", pitch, yaw, dx, dy)
+            self._send_correction(pitch, yaw)
+            return cmd
+
+        # Target not LOCKED — start or continue lost timer
+        if self._lost_since is None:
             self._lost_since = time.monotonic()
+            self._pid_yaw.reset()
+            self._pid_pitch.reset()
 
-        held_for = time.monotonic() - self._lost_since if self._lost_since else 0.0
+        lost = time.monotonic() - self._lost_since
 
-        if held_for < self._hold:
-            pitch_out, yaw_out = self._last_correction
-            self._send_correction(pitch_out, yaw_out, f"HOLD ({held_for:.1f}s)")
-            return pitch_out, yaw_out
+        if lost < self._t_search:
+            logging.info("SEARCHING  lost=%.1fs", lost)
+            return TrackingCommand(
+                state=TrackState.SEARCHING,
+                pitch=self._last_pitch, yaw=self._last_yaw,
+                lost_seconds=lost,
+                last_known_center=self._last_center,
+            )
 
-        # Hold expired — return to scan
-        if self._tracking:
-            logging.info("Target lost — returning to SCAN")
-            self._tracking = False
-            self._pitch_pid.reset()
-            self._yaw_pid.reset()
-            self._last_correction = (0.0, 0.0)
-            self._lost_since      = 0.0
+        if lost < self._t_nav:
+            logging.info("NAVIGATING  lost=%.1fs", lost)
+            return TrackingCommand(
+                state=TrackState.NAVIGATING,
+                lost_seconds=lost,
+                last_known_center=self._last_center,
+            )
 
-        self._send_correction(0.0, 0.0, "SCANNING")
-        return 0.0, 0.0
+        logging.info("ABORT  lost=%.1fs", lost)
+        return TrackingCommand(
+            state=TrackState.ABORT,
+            lost_seconds=lost,
+            last_known_center=self._last_center,
+        )
 
-    def _send_correction(self, pitch: float, yaw: float, state: str) -> None:
-        msg = f"{state:<12}  pitch={pitch:+.3f}  yaw={yaw:+.3f}"
-        logging.info(msg)
-        if self._sim:
-            pass  # mission loop prints; avoid duplicate stdout noise
-        # TODO: replace with MAVLink RC-override when flight controller is wired
-        # Example:
-        #   master.mav.rc_channels_override_send(
-        #       master.target_system, master.target_component,
-        #       _yaw_to_rc(yaw), _pitch_to_rc(pitch), 0, 0, 0, 0, 0, 0)
+    def reset(self) -> None:
+        self._lost_since   = None
+        self._last_pitch   = 0.0
+        self._last_yaw     = 0.0
+        self._pid_yaw.reset()
+        self._pid_pitch.reset()
+
+    @staticmethod
+    def _send_correction(pitch: float, yaw: float) -> None:
+        # TODO: MAVLink RC_CHANNELS_OVERRIDE
+        # master.mav.rc_channels_override_send(
+        #     target_system, target_component,
+        #     _yaw_to_rc(yaw), _pitch_to_rc(pitch),
+        #     0, 0, 0, 0, 0, 0)
+        pass
