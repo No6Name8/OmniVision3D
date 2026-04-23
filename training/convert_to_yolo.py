@@ -92,8 +92,8 @@ def _stem_to_raw_key(stem: str) -> str:
 # ---------------------------------------------------------------------------
 
 def convert(
-    raw_dir: str   = "dataset/raw/Shahed 136 Drone",
-    proc_dir: str  = "dataset/processed/Shahed 136 Drone",
+    raw_dir: str   = "dataset/raw/dji-mini-4-pro",
+    proc_dir: str  = "dataset/processed/DJI_Mini_4_Pro",
     out_dir: str   = "yolo_dataset",
     bg_thresh: int = 240,
     train_ratio: float = 0.8,

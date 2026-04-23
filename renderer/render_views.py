@@ -57,6 +57,34 @@ def _normalise_vertices(verts: np.ndarray) -> np.ndarray:
     return verts
 
 
+def _apply_dji_colors(o3d_mesh: o3d.geometry.TriangleMesh) -> None:
+    """
+    Paint vertex colors to approximate the real DJI Mini 4 Pro colour scheme.
+
+    After normalisation vertices lie in [-0.5, 0.5].  Radial distance from
+    the Y-axis identifies arms vs body; Y-coordinate identifies top vs bottom.
+
+    Mapping (RGB in [0, 1]):
+        Main body (central)       — dark grey  (80,  80,  80)
+        Bottom faces              — grey       (100, 100, 100)
+        Arms (radial 0.25–0.40)  — dark grey  (60,  60,  60)
+        Motor tips (> 0.40)      — black      (30,  30,  30)
+        Prop tips  (> 0.45)      — black      (20,  20,  20)
+    """
+    verts = np.asarray(o3d_mesh.vertices)
+    colors = np.full((len(verts), 3), [80 / 255, 80 / 255, 80 / 255])
+
+    y      = verts[:, 1]
+    radial = np.sqrt(verts[:, 0] ** 2 + verts[:, 2] ** 2)
+
+    colors[y < -0.05]                           = [100 / 255, 100 / 255, 100 / 255]
+    colors[(radial > 0.25) & (radial <= 0.40)]  = [60  / 255, 60  / 255, 60  / 255]
+    colors[(radial > 0.40) & (radial <= 0.45)]  = [30  / 255, 30  / 255, 30  / 255]
+    colors[radial > 0.45]                       = [20  / 255, 20  / 255, 20  / 255]
+
+    o3d_mesh.vertex_colors = o3d.utility.Vector3dVector(colors)
+
+
 def load_as_open3d(obj_path: str) -> o3d.geometry.TriangleMesh:
     """
     Load a mesh file and return a normalised Open3D TriangleMesh.
@@ -92,7 +120,7 @@ def load_as_open3d(obj_path: str) -> o3d.geometry.TriangleMesh:
         o3d_mesh.triangles = o3d.utility.Vector3iVector(tm.faces.astype(np.int32))
 
     o3d_mesh.compute_vertex_normals()
-    o3d_mesh.paint_uniform_color([0.6, 0.6, 0.6])
+    _apply_dji_colors(o3d_mesh)
     return o3d_mesh
 
 
