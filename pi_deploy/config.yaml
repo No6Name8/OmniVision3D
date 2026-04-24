@@ -2,7 +2,7 @@ yolo:
   model_path: vision/yolo_dji.onnx
   confidence_threshold: 0.50
   nms_threshold: 0.45
-  input_size: 512
+  input_size: 320
 
 identity_confirmation:
   model_path: vision/omnivision3d.onnx
