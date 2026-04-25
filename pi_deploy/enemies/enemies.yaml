@@ -1,0 +1,17 @@
+# OmniVision3D — Known enemy drone list
+#
+# To add a new enemy:
+#   1. Train OmniVision3D on the new target's 3D model
+#   2. Copy the exported .onnx to this folder (enemies/)
+#   3. Add an entry below with active: true
+#   4. That is all — no code changes needed
+#
+# threat_level: high / medium / low
+
+targets:
+  - name: DJI_Mini_4_Pro
+    model: enemies/DJI_Mini_4_Pro.onnx
+    threat_level: high
+    description: DJI Mini 4 Pro consumer drone
+    confidence_threshold: 0.85
+    active: true

@@ -30,12 +30,13 @@ from control.tracker       import TrackState
 
 
 # ---------------------------------------------------------------------------
-# Phase colours (BGR)
+# Phase / state colours (BGR)
 # ---------------------------------------------------------------------------
 _PHASE_COLOR = {
     Phase.SCANNING:   (255, 255, 255),
-    Phase.CONFIRMING: (0,   255, 255),
-    Phase.LOCKED:     (0,   255,   0),
+    Phase.ALERT:      (0,   165, 255),   # orange
+    Phase.CONFIRMING: (0,   255, 255),   # yellow
+    Phase.LOCKED:     (0,   255,   0),   # green
 }
 _STATE_COLOR = {
     TrackState.LOCKED:     (0, 255,   0),
@@ -75,8 +76,8 @@ def draw_camera_overlay(frame: np.ndarray, result, track_state, lost_secs: float
                     _FONT, 0.8, (0, 0, 255), _THICK2, cv2.LINE_AA)
         return out
 
-    # ---- SEARCHING ----
-    if track_state == TrackState.SEARCHING:
+    # ---- SEARCHING (after lock was lost) ----
+    if track_state == TrackState.SEARCHING and phase == Phase.SCANNING:
         cv2.rectangle(out, (0, 0), (w - 1, h - 1), (0, 165, 255), 3)
         cv2.putText(out, f"SEARCHING {lost_secs:.1f}s", (10, 30),
                     _FONT, _FONT_MED, (0, 165, 255), _THICK2, cv2.LINE_AA)
@@ -86,6 +87,20 @@ def draw_camera_overlay(frame: np.ndarray, result, track_state, lost_secs: float
     if phase == Phase.SCANNING:
         cv2.rectangle(out, (0, 0), (w - 1, h - 1), (0, 180, 0), 2)
         _draw_crosshair(out, (200, 200, 200))
+        return out
+
+    # ---- ALERT (unknown drone) ----
+    if phase == Phase.ALERT:
+        cv2.rectangle(out, (0, 0), (w - 1, h - 1), (0, 165, 255), 4)
+        det = result.detection
+        if det is not None:
+            x1, y1, x2, y2 = det.bbox
+            cv2.rectangle(out, (x1, y1), (x2, y2), (0, 165, 255), 2)
+            consec = result.identity.consecutive if result.identity else 0
+            cv2.putText(out, f"UNKNOWN DRONE [{consec}]", (x1, y1 - 8),
+                        _FONT, _FONT_SMALL, (0, 165, 255), _THICK2, cv2.LINE_AA)
+        cv2.putText(out, "UNKNOWN DRONE DETECTED", (10, 30),
+                    _FONT, _FONT_MED, (0, 165, 255), _THICK2, cv2.LINE_AA)
         return out
 
     det = result.detection
@@ -109,7 +124,10 @@ def draw_camera_overlay(frame: np.ndarray, result, track_state, lost_secs: float
     cv2.rectangle(out, (0, 0), (w - 1, h - 1), (0, 0, 220), 4)
     cv2.rectangle(out, (x1, y1), (x2, y2), (0, 220, 0), 3)
     conf = result.identity.confidence if result.identity else 0.0
-    cv2.putText(out, f"LOCKED ON {conf:.0%}", (x1, y1 - 8),
+    name = (result.classification.threat_name
+            if result.classification and result.classification.threat_name
+            else "DRONE")
+    cv2.putText(out, f"LOCKED: {name}  {conf:.0%}", (x1, y1 - 8),
                 _FONT, _FONT_SMALL, (0, 220, 0), _THICK2, cv2.LINE_AA)
     frame_cx, frame_cy = w // 2, h // 2
     cv2.line(out, (frame_cx, frame_cy), (cx_t, cy_t), (0, 220, 0), 1)
@@ -139,8 +157,11 @@ def build_status_panel(result, track_state, lost_secs: float,
     phase = result.phase
     phase_color = _PHASE_COLOR.get(phase, (200, 200, 200))
     if track_state in (TrackState.SEARCHING, TrackState.NAVIGATING, TrackState.ABORT):
-        phase_color = _STATE_COLOR.get(track_state, (200, 200, 200))
-        phase_label = track_state.value
+        if phase not in (Phase.ALERT, Phase.CONFIRMING, Phase.LOCKED):
+            phase_color = _STATE_COLOR.get(track_state, (200, 200, 200))
+            phase_label = track_state.value
+        else:
+            phase_label = phase.value
     else:
         phase_label = phase.value
     put(f"Phase: {phase_label}", 60, phase_color)
@@ -153,15 +174,26 @@ def build_status_panel(result, track_state, lost_secs: float,
     yolo_conf = result.detection.confidence if result.detection else 0.0
     id_conf   = result.identity.confidence  if result.identity  else 0.0
     consec    = result.identity.consecutive if result.identity  else 0
+    req       = result.identity.required    if result.identity  else 3
     put(f"YOLO:  {yolo_conf:.0%}", 116)
     put(f"ID:    {id_conf:.0%}",   138)
-    put(f"Conf:  {consec}/3",      160)
-    hline(174)
+    put(f"Conf:  {consec}/{req}",  160)
+
+    # Threat name (when known)
+    if result.classification and result.classification.threat_name:
+        name_color = (0, 220, 0) if phase == Phase.LOCKED else (0, 165, 255)
+        put(f"  {result.classification.threat_name}", 178, name_color, 0.42)
+        hline(192)
+    else:
+        hline(174)
 
     # Recent detections log
-    put("RECENT DETECTIONS", 194, (160, 160, 160))
+    put("RECENT DETECTIONS", 208, (160, 160, 160))
     for i, entry in enumerate(list(log)[-5:]):
-        put(entry, 214 + i * 20, (120, 120, 120), 0.42)
+        color = (0, 165, 255) if "ALERT" in entry else \
+                (0, 220, 0)   if "LOCKED" in entry else \
+                (120, 120, 120)
+        put(entry, 228 + i * 20, color, 0.42)
 
     # Lost timer if applicable
     if track_state in (TrackState.SEARCHING, TrackState.NAVIGATING):
@@ -201,6 +233,7 @@ def run(args: argparse.Namespace) -> None:
     time.sleep(2.0)
 
     cfg = yaml.safe_load(open(_ROOT / "config.yaml"))
+    cfg["_root"] = str(_ROOT)
 
     enhancer = FrameEnhancer()
     pipeline = VisionPipeline(cfg)
@@ -240,18 +273,32 @@ def run(args: argparse.Namespace) -> None:
         if result.phase == Phase.LOCKED:
             track_state = TrackState.LOCKED
             lost_secs   = 0.0
-        elif result.phase in (Phase.SCANNING, Phase.CONFIRMING):
-            track_state = TrackState.SEARCHING
-            lost_secs   = 0.0
+        elif result.phase in (Phase.SCANNING, Phase.CONFIRMING, Phase.ALERT):
+            if track_state == TrackState.LOCKED:
+                track_state = TrackState.SEARCHING  # just lost lock
+            elif result.phase in (Phase.CONFIRMING, Phase.ALERT):
+                track_state = TrackState.LOCKED      # show active detection state
+                lost_secs   = 0.0
+            else:
+                track_state = TrackState.SEARCHING
+                lost_secs   = 0.0
 
         # Log notable events
         now_str = time.strftime("%H:%M:%S")
         if result.phase == Phase.LOCKED:
             conf = result.identity.confidence if result.identity else 0.0
-            log.append(f"{now_str} LOCKED {conf:.0%}")
+            name = (result.classification.threat_name
+                    if result.classification and result.classification.threat_name
+                    else "DRONE")
+            log.append(f"{now_str} LOCKED {name} {conf:.0%}")
+        elif result.phase == Phase.ALERT:
+            consec = result.identity.consecutive if result.identity else 0
+            conf   = result.identity.confidence  if result.identity else 0.0
+            log.append(f"{now_str} ALERT unknown {conf:.0%} [{consec}]")
         elif result.phase == Phase.CONFIRMING:
             n = result.identity.consecutive if result.identity else 0
-            log.append(f"{now_str} CONF {n}/3")
+            r = result.identity.required    if result.identity else 3
+            log.append(f"{now_str} CONF {n}/{r}")
 
         overlay = draw_camera_overlay(frame.copy(), result, track_state, lost_secs)
         panel   = build_status_panel(result, track_state, lost_secs, cam_fps_val, log)
@@ -266,8 +313,9 @@ def run(args: argparse.Namespace) -> None:
             state = enhancer.toggle()
             print(f"Enhancement: {'ON' if state else 'OFF'}")
         if key == ord("r"):
-            pipeline._confirmer.reset()
+            pipeline.reset()
             log.clear()
+            track_state = TrackState.SEARCHING
             print("Pipeline reset")
         if key == ord("s"):
             fname = f"screenshot_{time.time():.0f}.png"

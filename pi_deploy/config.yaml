@@ -29,4 +29,9 @@ camera:
   width: 640
   height: 480
 
+drone_classifier:
+  generic_threshold: 0.30
+  unknown_alert_frames: 3
+  enemies_file: enemies/enemies.yaml
+
 simulation_mode: true
