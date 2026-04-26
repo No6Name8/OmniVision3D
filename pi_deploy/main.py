@@ -56,20 +56,19 @@ def _load_config(path: str) -> dict:
 
 def _print_banner(cfg: dict) -> None:
     ycfg  = cfg["yolo"]
-    icfg  = cfg["identity_confirmation"]
     tcfg  = cfg["tracking"]
     dccfg = cfg.get("drone_classifier", {})
     print("\n" + "=" * 50)
     print("  OMNIVISION3D — DJI MINI 4 PRO")
     print("=" * 50)
-    print(f"  YOLO:              {ycfg['model_path']} (11.6MB)")
-    print(f"  Enemy models:      {dccfg.get('enemies_file', 'enemies/enemies.yaml')}")
-    print(f"  Generic threshold: {dccfg.get('generic_threshold', 0.30):.0%}")
-    print(f"  Alert after:       {dccfg.get('unknown_alert_frames', 3)} consecutive frames")
-    print(f"  Frames to lock:    {icfg['consecutive_required']}")
-    print(f"  Lost -> Search:    {tcfg['lost_searching_seconds']}s")
-    print(f"  Lost -> Navigate:  {tcfg['lost_navigating_seconds']}s")
-    print(f"  Lost -> Abort:     abort + return to base")
+    print(f"  YOLO:              {ycfg['model_path']}")
+    print(f"  Lock threshold:    {dccfg.get('generic_threshold', 0.50):.0%} x "
+          f"{dccfg.get('consecutive_required', 3)} frames")
+    print(f"  Enemy ID:          every {dccfg.get('enemy_id_every_n_frames', 5)} frames (non-blocking)")
+    print(f"  Enemy file:        {dccfg.get('enemies_file', 'enemies/enemies.yaml')}")
+    print(f"  Lost -> Search:    {dccfg.get('lost_timeout_seconds', 2.0)}s (pipeline)")
+    print(f"  Search -> Nav:     {tcfg['lost_searching_seconds']}s (tracker)")
+    print(f"  Nav -> Abort:      {tcfg['lost_navigating_seconds']}s (tracker)")
     print("=" * 50 + "\n")
 
 
@@ -80,7 +79,6 @@ def run_mission(args: argparse.Namespace) -> None:
     nav_cfg = cfg["navigation"]
     cam_cfg = cfg["camera"]
     dccfg   = cfg.get("drone_classifier", {})
-    alert_frames_required = dccfg.get("unknown_alert_frames", 3)
 
     _print_banner(cfg)
 
@@ -121,13 +119,11 @@ def run_mission(args: argparse.Namespace) -> None:
     # ---- Mission stats ----
     frames_total        = 0
     yolo_hits           = 0
-    alerts_logged       = 0
     confirmations       = 0
     tracking_start      = None
     tracking_secs       = 0.0
     end_reason          = "user_exit"
     intercept_announced = False
-    alert_announced     = False
 
     last_print = time.time()
 
@@ -146,14 +142,9 @@ def run_mission(args: argparse.Namespace) -> None:
 
             result = pipeline.process_frame(frame)
 
-            # ---- Tracker update — skip for ALERT (hold position) ----
-            if result.phase == Phase.ALERT:
-                # Unknown drone: hold position, do not engage tracker
-                # TODO: connect to command center alert API
-                tracker.reset()
-                cmd = TrackingCommand(state=TrackState.SEARCHING, lost_seconds=0.0)
-            else:
-                cmd = tracker.update(result)
+            # ---- Tracker update ----
+            # SEARCHING: pipeline already handles the lost timer; pass through
+            cmd = tracker.update(result)
 
             overlay = pipeline.draw_overlay(frame, result)
 
@@ -170,30 +161,22 @@ def run_mission(args: argparse.Namespace) -> None:
             if now - last_print >= 1.0:
                 last_print = now
 
-                if result.phase == Phase.ALERT:
-                    consec = result.identity.consecutive if result.identity else 0
-                    conf   = result.classification.confidence if result.classification else 0.0
-                    print(f"\rALERT | UNKNOWN DRONE | "
-                          f"frames:{consec} conf:{conf:.0%} | "
+                if result.phase == Phase.SEARCHING:
+                    intercept_announced = False
+                    print(f"\rSEARCHING | lost:{cmd.lost_seconds:.1f}s | "
                           f"FPS:{result.fps:.1f}   ", end="", flush=True)
-                    if not alert_announced:
-                        print("\n!! UNKNOWN DRONE — ALERTING COMMAND !!")
-                        log.info("UNKNOWN DRONE DETECTED — ALERTING")
-                        alert_announced = True
 
                 elif cmd.state == TrackState.LOCKED:
                     if not intercept_announced:
                         print("\n!! INTERCEPT COMMITTED !!")
                         log.info("INTERCEPT COMMITTED")
                         intercept_announced = True
-                    alert_announced = False
                     print(f"\rLOCKED | dx:{cmd.dx:+d} dy:{cmd.dy:+d} | "
                           f"pitch:{cmd.pitch:+.2f} yaw:{cmd.yaw:+.2f} | "
                           f"FPS:{result.fps:.1f}   ", end="", flush=True)
 
                 elif cmd.state == TrackState.SEARCHING:
                     intercept_announced = False
-                    alert_announced     = False
                     print(f"\rSEARCHING | lost:{cmd.lost_seconds:.1f}s | "
                           f"FPS:{result.fps:.1f}   ", end="", flush=True)
 
@@ -210,20 +193,8 @@ def run_mission(args: argparse.Namespace) -> None:
 
                 else:
                     intercept_announced = False
-                    alert_announced     = False
                     print(f"\rSCANNING... | FPS:{result.fps:.1f}   ",
                           end="", flush=True)
-
-            # ---- Alert log (once, after N consecutive ALERT frames) ----
-            if result.phase == Phase.ALERT:
-                consec = result.identity.consecutive if result.identity else 0
-                if consec >= alert_frames_required and alerts_logged == 0:
-                    conf = result.classification.confidence if result.classification else 0.0
-                    bbox = result.classification.bbox       if result.classification else None
-                    alert_log.info("UNKNOWN_DRONE conf=%.3f bbox=%s", conf, bbox)
-                    alerts_logged += 1
-            else:
-                alerts_logged = 0   # reset so next unknown episode gets logged
 
             # ---- CSV log ----
             yc = result.detection.confidence if result.detection else 0.0

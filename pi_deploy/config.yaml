@@ -30,8 +30,10 @@ camera:
   height: 480
 
 drone_classifier:
-  generic_threshold: 0.30
-  unknown_alert_frames: 3
+  generic_threshold: 0.50
+  consecutive_required: 3
+  lost_timeout_seconds: 2.0
+  enemy_id_every_n_frames: 5
   enemies_file: enemies/enemies.yaml
 
 simulation_mode: true

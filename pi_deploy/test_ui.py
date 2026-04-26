@@ -34,9 +34,9 @@ from control.tracker       import TrackState
 # ---------------------------------------------------------------------------
 _PHASE_COLOR = {
     Phase.SCANNING:   (255, 255, 255),
-    Phase.ALERT:      (0,   165, 255),   # orange
-    Phase.CONFIRMING: (0,   255, 255),   # yellow
-    Phase.LOCKED:     (0,   255,   0),   # green
+    Phase.SEARCHING:  (0,   165, 255),   # orange
+    Phase.CONFIRMING: (0,   220, 220),   # cyan
+    Phase.LOCKED:     (0,   220,   0),   # green
 }
 _STATE_COLOR = {
     TrackState.LOCKED:     (0, 255,   0),
@@ -76,8 +76,8 @@ def draw_camera_overlay(frame: np.ndarray, result, track_state, lost_secs: float
                     _FONT, 0.8, (0, 0, 255), _THICK2, cv2.LINE_AA)
         return out
 
-    # ---- SEARCHING (after lock was lost) ----
-    if track_state == TrackState.SEARCHING and phase == Phase.SCANNING:
+    # ---- SEARCHING (drone lost after lock) ----
+    if phase == Phase.SEARCHING:
         cv2.rectangle(out, (0, 0), (w - 1, h - 1), (0, 165, 255), 3)
         cv2.putText(out, f"SEARCHING {lost_secs:.1f}s", (10, 30),
                     _FONT, _FONT_MED, (0, 165, 255), _THICK2, cv2.LINE_AA)
@@ -87,20 +87,6 @@ def draw_camera_overlay(frame: np.ndarray, result, track_state, lost_secs: float
     if phase == Phase.SCANNING:
         cv2.rectangle(out, (0, 0), (w - 1, h - 1), (0, 180, 0), 2)
         _draw_crosshair(out, (200, 200, 200))
-        return out
-
-    # ---- ALERT (unknown drone) ----
-    if phase == Phase.ALERT:
-        cv2.rectangle(out, (0, 0), (w - 1, h - 1), (0, 165, 255), 4)
-        det = result.detection
-        if det is not None:
-            x1, y1, x2, y2 = det.bbox
-            cv2.rectangle(out, (x1, y1), (x2, y2), (0, 165, 255), 2)
-            consec = result.identity.consecutive if result.identity else 0
-            cv2.putText(out, f"UNKNOWN DRONE [{consec}]", (x1, y1 - 8),
-                        _FONT, _FONT_SMALL, (0, 165, 255), _THICK2, cv2.LINE_AA)
-        cv2.putText(out, "UNKNOWN DRONE DETECTED", (10, 30),
-                    _FONT, _FONT_MED, (0, 165, 255), _THICK2, cv2.LINE_AA)
         return out
 
     det = result.detection
@@ -157,7 +143,7 @@ def build_status_panel(result, track_state, lost_secs: float,
     phase = result.phase
     phase_color = _PHASE_COLOR.get(phase, (200, 200, 200))
     if track_state in (TrackState.SEARCHING, TrackState.NAVIGATING, TrackState.ABORT):
-        if phase not in (Phase.ALERT, Phase.CONFIRMING, Phase.LOCKED):
+        if phase not in (Phase.SEARCHING, Phase.CONFIRMING, Phase.LOCKED):
             phase_color = _STATE_COLOR.get(track_state, (200, 200, 200))
             phase_label = track_state.value
         else:
@@ -273,15 +259,16 @@ def run(args: argparse.Namespace) -> None:
         if result.phase == Phase.LOCKED:
             track_state = TrackState.LOCKED
             lost_secs   = 0.0
-        elif result.phase in (Phase.SCANNING, Phase.CONFIRMING, Phase.ALERT):
-            if track_state == TrackState.LOCKED:
-                track_state = TrackState.SEARCHING  # just lost lock
-            elif result.phase in (Phase.CONFIRMING, Phase.ALERT):
-                track_state = TrackState.LOCKED      # show active detection state
-                lost_secs   = 0.0
-            else:
+        elif result.phase == Phase.SEARCHING:
+            lost_secs += 1.0 / max(cam_fps_val, 1.0)
+            if track_state != TrackState.SEARCHING:
                 track_state = TrackState.SEARCHING
-                lost_secs   = 0.0
+        elif result.phase == Phase.CONFIRMING:
+            track_state = TrackState.LOCKED  # show active detection colour
+            lost_secs   = 0.0
+        else:  # SCANNING
+            track_state = TrackState.SEARCHING
+            lost_secs   = 0.0
 
         # Log notable events
         now_str = time.strftime("%H:%M:%S")
@@ -291,10 +278,8 @@ def run(args: argparse.Namespace) -> None:
                     if result.classification and result.classification.threat_name
                     else "DRONE")
             log.append(f"{now_str} LOCKED {name} {conf:.0%}")
-        elif result.phase == Phase.ALERT:
-            consec = result.identity.consecutive if result.identity else 0
-            conf   = result.identity.confidence  if result.identity else 0.0
-            log.append(f"{now_str} ALERT unknown {conf:.0%} [{consec}]")
+        elif result.phase == Phase.SEARCHING:
+            log.append(f"{now_str} SEARCHING {lost_secs:.1f}s")
         elif result.phase == Phase.CONFIRMING:
             n = result.identity.consecutive if result.identity else 0
             r = result.identity.required    if result.identity else 3
