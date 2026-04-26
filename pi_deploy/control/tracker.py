@@ -99,6 +99,7 @@ class Tracker:
         self._last_yaw:    float = 0.0
         self._last_center: Optional[Tuple[int, int]] = None
         self._lost_since:  Optional[float] = None
+        self._was_locked    = False
         self._was_searching = False
 
     # ------------------------------------------------------------------
@@ -108,6 +109,13 @@ class Tracker:
         if result.phase == Phase.LOCKED and result.detection is not None:
             self._lost_since    = None
             self._was_searching = False
+
+            # Engage intercept on first LOCKED frame
+            if not self._was_locked:
+                self._was_locked = True
+                self._motor.engage_intercept()
+                print("TARGET LOCKED -- INTERCEPT COMMITTED")
+                logging.info("INTERCEPT_COMMITTED ts=%.3f", time.monotonic())
 
             cx, cy = result.detection.center
             frame_cx = self._frame_w / 2.0
@@ -152,6 +160,9 @@ class Tracker:
             self._pid_yaw.reset()
             self._pid_pitch.reset()
             self._motor.reset()
+            if self._was_locked:
+                self._was_locked = False
+                self._motor.disengage_intercept()
 
         lost = time.monotonic() - self._lost_since
 
@@ -183,7 +194,10 @@ class Tracker:
         )
 
     def reset(self) -> None:
+        if self._was_locked:
+            self._motor.disengage_intercept()
         self._lost_since    = None
+        self._was_locked    = False
         self._was_searching = False
         self._last_pitch    = 0.0
         self._last_yaw      = 0.0

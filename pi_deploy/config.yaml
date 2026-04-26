@@ -37,7 +37,9 @@ drone_classifier:
   enemies_file: enemies/enemies.yaml
 
 motor_control:
+  cruise_power_us: 1500
   base_power_us: 1500
+  intercept_power_us: 1900
   min_power_us: 1000
   max_power_us: 2000
   max_correction_pct: 20

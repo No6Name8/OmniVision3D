@@ -87,7 +87,11 @@ class MotorController:
         self._flip_yaw   = bool(mmcfg.get("flip_yaw",   False))
         self._flip_pitch = bool(mmcfg.get("flip_pitch", False))
 
-        print(f"[MotorController] Base: {self._base_us}us  "
+        self.intercept_mode      = False
+        self._intercept_power_us = int(mcfg.get("intercept_power_us", 1900))
+
+        print(f"[MotorController] Cruise: {self._base_us}us  "
+              f"Intercept: {self._intercept_power_us}us  "
               f"Max correction: {self._max_correction:.0f}%  "
               f"PID Kp={self._kp} Ki={self._ki} Kd={self._kd}")
         print(f"[MotorController] Mapping: "
@@ -97,6 +101,18 @@ class MotorController:
               f"RR=CH{self._mapping['rear_right']}")
         if self._sim:
             print("[MotorController] SIMULATION MODE (no hardware commands)")
+
+    # ------------------------------------------------------------------
+    def engage_intercept(self) -> None:
+        """Switch to intercept power level. Call once when LOCKED state is first entered."""
+        self.intercept_mode = True
+        _log.info("INTERCEPT_ENGAGED  base=%dus", self._intercept_power_us)
+        print("INTERCEPT ENGAGED -- FULL THRUST")
+
+    def disengage_intercept(self) -> None:
+        """Return to cruise power. Call when leaving LOCKED state."""
+        self.intercept_mode = False
+        print("INTERCEPT DISENGAGED")
 
     # ------------------------------------------------------------------
     @staticmethod
@@ -157,15 +173,19 @@ class MotorController:
         yaw_pct     = corrections["yaw"]
         pitch_pct   = corrections["pitch"]
 
-        # Convert percentage to microseconds (relative to base)
+        # Active base: intercept (1900us) or cruise (1500us)
+        active_base = self._intercept_power_us if self.intercept_mode else self._base_us
+
+        # Correction magnitude always relative to cruise base so differential
+        # steering effort is independent of throttle level
         yaw_us   = (yaw_pct   / 100.0) * self._base_us
         pitch_us = (pitch_pct / 100.0) * self._base_us
 
         # Logical motor values
-        m1 = self._base_us + yaw_us + pitch_us   # front-left
-        m2 = self._base_us - yaw_us + pitch_us   # front-right
-        m3 = self._base_us + yaw_us - pitch_us   # rear-left
-        m4 = self._base_us - yaw_us - pitch_us   # rear-right
+        m1 = active_base + yaw_us + pitch_us   # front-left
+        m2 = active_base - yaw_us + pitch_us   # front-right
+        m3 = active_base + yaw_us - pitch_us   # rear-left
+        m4 = active_base - yaw_us - pitch_us   # rear-right
 
         motors = {
             "front_left":  m1,
@@ -180,9 +200,9 @@ class MotorController:
             us_val = int(max(self._min_us, min(self._max_us, motors[motor_name])))
             channels[f"channel_{ch_num}"] = us_val
 
-        # Ensure all 4 channels are present (fill any unmapped with base)
+        # Ensure all 4 channels are present (fill any unmapped with active base)
         for i in range(1, 5):
-            channels.setdefault(f"channel_{i}", self._base_us)
+            channels.setdefault(f"channel_{i}", active_base)
 
         return {
             "channel_1":           channels["channel_1"],
@@ -209,7 +229,8 @@ class MotorController:
         pitch_pct = motor_powers["pitch_correction_pct"]
 
         if self._sim:
-            print(f"  MOTOR COMMANDS:")
+            mode = "INTERCEPT" if self.intercept_mode else "CRUISE"
+            print(f"  MOTOR COMMANDS [{mode}]:")
             print(f"    CH1: {ch1}us  ({yaw_pct:+.1f}% yaw)")
             print(f"    CH2: {ch2}us")
             print(f"    CH3: {ch3}us")
