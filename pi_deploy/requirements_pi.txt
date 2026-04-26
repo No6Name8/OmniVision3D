@@ -1,5 +1,4 @@
 onnxruntime
 opencv-python
 numpy
-Pillow
 pyyaml

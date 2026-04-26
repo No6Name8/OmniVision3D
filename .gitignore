@@ -63,6 +63,9 @@ ehthumbs.db
 *.suo
 *.user
 
+# ── Kill switch (file-based drone stop signal — never commit) ────────────────
+pi_deploy/KILL
+
 # ── Misc ──────────────────────────────────────────────────────────────────────
 =0*
 tests/test_images/
