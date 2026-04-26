@@ -1,0 +1,17 @@
+camera:
+  index: 0
+  width: 640
+  height: 480
+
+detection:
+  model_path: ../pi_deploy/vision/yolo_dji.onnx
+  conf_threshold: 0.50
+  consecutive_required: 3
+  input_size: 320
+
+comms:
+  laptop_ip: 192.168.1.100
+  alert_port: 5555
+  source_id: GROUND_UNIT_001
+
+simulation_mode: true
