@@ -36,6 +36,27 @@ drone_classifier:
   enemy_id_every_n_frames: 5
   enemies_file: enemies/enemies.yaml
 
+motor_control:
+  base_power_us: 1500
+  min_power_us: 1000
+  max_power_us: 2000
+  max_correction_pct: 20
+  max_pixel_offset: 320
+  simulation_mode: true
+  pid:
+    Kp: 0.06
+    Ki: 0.001
+    Kd: 0.01
+
+motor_mapping:
+  front_left:  channel_1
+  front_right: channel_2
+  rear_left:   channel_3
+  rear_right:  channel_4
+  flip_yaw:    false
+  flip_pitch:  false
+  calibrated:  false
+
 launch_listener:
   enabled: true
   port: 5556

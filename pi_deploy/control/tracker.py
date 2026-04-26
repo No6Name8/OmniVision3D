@@ -2,21 +2,25 @@
 tracker.py — State-machine target tracker for OmniVision3D.
 
 States:
-    LOCKED      : target visible, PID corrections active
-    SEARCHING   : target lost < 3s, hold last correction
+    LOCKED      : target visible, PID corrections active → motor commands sent
+    SEARCHING   : target lost < 3s, hold last heading, motor controller reset
     NAVIGATING  : target lost 3–10s, fly to last known position
     ABORT       : target lost > 10s, return to base
 
-TODO (MAVLink wiring):
-    Replace _send_correction() stub with RC_CHANNELS_OVERRIDE commands.
+Motor control:
+    LOCKED     → MotorController.calculate_motor_powers(dx, dy) → send_to_pixhawk()
+    SEARCHING  → motor_controller.reset(), print HOLDING
+    NAVIGATING → motor_controller.reset()
 """
 
 import logging
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Dict, Optional, Tuple
+
+from control.motor_controller import MotorController
 
 _LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
 _LOG_DIR.mkdir(exist_ok=True)
@@ -43,6 +47,7 @@ class TrackingCommand:
     dy:                 int   = 0
     lost_seconds:       float = 0.0
     last_known_center:  Optional[Tuple[int, int]] = None
+    motor_powers:       Dict  = field(default_factory=dict)
 
 
 class _PID:
@@ -70,7 +75,7 @@ class _PID:
 
 class Tracker:
     """
-    Converts PipelineResult into pitch/yaw corrections with loss-state handling.
+    Converts PipelineResult into pitch/yaw corrections and motor PWM commands.
     """
 
     def __init__(self, config: dict) -> None:
@@ -88,27 +93,21 @@ class Tracker:
         self._pid_yaw   = _PID(kp, ki, kd)
         self._pid_pitch = _PID(kp, ki, kd)
 
-        self._last_pitch: float = 0.0
-        self._last_yaw:   float = 0.0
+        self._motor = MotorController(config)
+
+        self._last_pitch:  float = 0.0
+        self._last_yaw:    float = 0.0
         self._last_center: Optional[Tuple[int, int]] = None
         self._lost_since:  Optional[float] = None
+        self._was_searching = False
 
     # ------------------------------------------------------------------
     def update(self, result) -> TrackingCommand:
-        """
-        Compute next tracking command from a PipelineResult.
-
-        Args:
-            result: PipelineResult from VisionPipeline.process_frame()
-
-        Returns:
-            TrackingCommand with state, pitch, yaw, dx, dy.
-        """
         from vision.pipeline import Phase
 
         if result.phase == Phase.LOCKED and result.detection is not None:
-            self._lost_since = None
-            self._pid_yaw.reset() if self._lost_since is not None else None
+            self._lost_since    = None
+            self._was_searching = False
 
             cx, cy = result.detection.center
             frame_cx = self._frame_w / 2.0
@@ -122,7 +121,6 @@ class Tracker:
 
             yaw   = float(self._pid_yaw.update(norm_dx))
             pitch = float(self._pid_pitch.update(-norm_dy))
-
             yaw   = max(-1.0, min(1.0, yaw))
             pitch = max(-1.0, min(1.0, pitch))
 
@@ -130,14 +128,22 @@ class Tracker:
             self._last_yaw    = yaw
             self._last_center = result.detection.center
 
+            # Motor control
+            motor_powers = self._motor.calculate_motor_powers(dx, dy)
+            self._motor.send_to_pixhawk(motor_powers)
+
             cmd = TrackingCommand(
                 state=TrackState.LOCKED,
                 pitch=pitch, yaw=yaw,
                 dx=dx, dy=dy,
                 last_known_center=self._last_center,
+                motor_powers=motor_powers,
             )
-            logging.info("LOCKED  pitch=%+.3f yaw=%+.3f dx=%d dy=%d", pitch, yaw, dx, dy)
-            self._send_correction(pitch, yaw)
+            logging.info("LOCKED  pitch=%+.3f yaw=%+.3f dx=%d dy=%d "
+                         "CH1=%d CH2=%d CH3=%d CH4=%d",
+                         pitch, yaw, dx, dy,
+                         motor_powers["channel_1"], motor_powers["channel_2"],
+                         motor_powers["channel_3"], motor_powers["channel_4"])
             return cmd
 
         # Target not LOCKED — start or continue lost timer
@@ -145,11 +151,15 @@ class Tracker:
             self._lost_since = time.monotonic()
             self._pid_yaw.reset()
             self._pid_pitch.reset()
+            self._motor.reset()
 
         lost = time.monotonic() - self._lost_since
 
         if lost < self._t_search:
-            logging.info("SEARCHING  lost=%.1fs", lost)
+            if not self._was_searching:
+                self._was_searching = True
+                logging.info("SEARCHING — motor reset, holding last heading")
+                print("  [Tracker] HOLDING last heading (motor PID reset)")
             return TrackingCommand(
                 state=TrackState.SEARCHING,
                 pitch=self._last_pitch, yaw=self._last_yaw,
@@ -173,17 +183,10 @@ class Tracker:
         )
 
     def reset(self) -> None:
-        self._lost_since   = None
-        self._last_pitch   = 0.0
-        self._last_yaw     = 0.0
+        self._lost_since    = None
+        self._was_searching = False
+        self._last_pitch    = 0.0
+        self._last_yaw      = 0.0
         self._pid_yaw.reset()
         self._pid_pitch.reset()
-
-    @staticmethod
-    def _send_correction(pitch: float, yaw: float) -> None:
-        # TODO: MAVLink RC_CHANNELS_OVERRIDE
-        # master.mav.rc_channels_override_send(
-        #     target_system, target_component,
-        #     _yaw_to_rc(yaw), _pitch_to_rc(pitch),
-        #     0, 0, 0, 0, 0, 0)
-        pass
+        self._motor.reset()
