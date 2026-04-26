@@ -1,0 +1,10 @@
+comms:
+  listen_port: 5555
+  drone_ip: 192.168.1.200
+  drone_port: 5556
+
+display:
+  show_all_alerts: true
+  log_to_file: true
+
+simulation_mode: true

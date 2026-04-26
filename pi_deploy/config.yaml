@@ -36,4 +36,9 @@ drone_classifier:
   enemy_id_every_n_frames: 5
   enemies_file: enemies/enemies.yaml
 
+launch_listener:
+  enabled: true
+  port: 5556
+  wait_for_launch: false   # set true to hold in STANDBY until laptop sends LAUNCH
+
 simulation_mode: true

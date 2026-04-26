@@ -1,20 +1,29 @@
 """
 main.py — OmniVision3D mission loop for Raspberry Pi.
 
-Pipeline: YOLO (generic, 30%) → EnemyIdentifier → Phase state machine
-Phases: SCANNING → ALERT (unknown) / CONFIRMING (known) → LOCKED
+Pipeline: YOLO → DroneClassifier → Phase state machine
+Phases: SCANNING → CONFIRMING → LOCKED / SEARCHING
+
+Launch flow:
+    Laptop monitor sends LAUNCH command over UDP port 5556.
+    Without --wait-launch the drone scans immediately (sim default).
+    With --wait-launch it holds in STANDBY until LAUNCH is received.
 
 Usage:
     python main.py --lat 24.7136 --lon 46.6753
     python main.py --video tests/test_video.mp4 --sim
     python main.py --sim                           # skip GPS, scan immediately
+    python main.py --wait-launch                   # hold until laptop sends LAUNCH
 """
 
 import argparse
 import csv
+import json
 import logging
 import signal
+import socket
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -47,6 +56,66 @@ alert_log.propagate = False
 
 
 # ---------------------------------------------------------------------------
+# UDP launch listener — runs in a background thread, sets mission_active flag
+# ---------------------------------------------------------------------------
+class _LaunchListener:
+    """
+    Listens on UDP port 5556 for LAUNCH / ABORT commands from the laptop monitor.
+    Thread-safe: read mission_active and abort_requested from the main loop.
+    """
+
+    def __init__(self, port: int = 5556) -> None:
+        self._port           = port
+        self.mission_active  = False
+        self.abort_requested = False
+        self._sock           = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self._sock.settimeout(0.5)
+        self._sock.bind(("0.0.0.0", port))
+        self._running = False
+        self._thread: threading.Thread | None = None
+
+    def start(self) -> "_LaunchListener":
+        self._running = True
+        self._thread  = threading.Thread(target=self._loop, daemon=True)
+        self._thread.start()
+        print(f"[LaunchListener] Listening for commands on UDP :{self._port}")
+        return self
+
+    def stop(self) -> None:
+        self._running = False
+        if self._thread:
+            self._thread.join(timeout=2.0)
+        self._sock.close()
+
+    def _loop(self) -> None:
+        while self._running:
+            try:
+                data, addr = self._sock.recvfrom(4096)
+            except socket.timeout:
+                continue
+            except OSError:
+                break
+            try:
+                pkt = json.loads(data.decode())
+            except json.JSONDecodeError:
+                continue
+
+            cmd = pkt.get("command", "")
+            if cmd == "LAUNCH":
+                self.mission_active = True
+                print(f"\n!! LAUNCH COMMAND RECEIVED FROM {addr[0]} !!")
+                print(f"   Target confidence: {pkt.get('target_confidence', 0):.0%}")
+                print(f"   Heading:           {pkt.get('compass_heading')}°\n")
+                log.info("LAUNCH received from %s conf=%.3f",
+                         addr[0], pkt.get("target_confidence", 0))
+            elif cmd == "ABORT":
+                self.abort_requested = True
+                print(f"\n!! ABORT COMMAND RECEIVED FROM {addr[0]} !!\n")
+                log.info("ABORT received from %s", addr[0])
+
+
+# ---------------------------------------------------------------------------
 def _load_config(path: str) -> dict:
     with open(path) as f:
         cfg = yaml.safe_load(f)
@@ -69,6 +138,9 @@ def _print_banner(cfg: dict) -> None:
     print(f"  Lost -> Search:    {dccfg.get('lost_timeout_seconds', 2.0)}s (pipeline)")
     print(f"  Search -> Nav:     {tcfg['lost_searching_seconds']}s (tracker)")
     print(f"  Nav -> Abort:      {tcfg['lost_navigating_seconds']}s (tracker)")
+    lcfg = cfg.get("launch_listener", {})
+    if lcfg.get("enabled", False):
+        print(f"  Launch port:       :{lcfg.get('port', 5556)} (waiting for laptop LAUNCH command)")
     print("=" * 50 + "\n")
 
 
@@ -82,10 +154,32 @@ def run_mission(args: argparse.Namespace) -> None:
 
     _print_banner(cfg)
 
+    # ---- Signal handler (must be set early for standby loop) ----
+    running = [True]
+    def _stop(sig, frame): running[0] = False
+    signal.signal(signal.SIGINT, _stop)
+
     # ---- Init ----
     pipeline = VisionPipeline(cfg)
     tracker  = Tracker(cfg)
     nav      = GPSNav(nav_cfg["home_lat"], nav_cfg["home_lon"])
+
+    # ---- Launch listener (always running; required for --wait-launch) ----
+    lcfg            = cfg.get("launch_listener", {})
+    launch_port     = lcfg.get("port", 5556)
+    wait_for_launch = args.wait_launch or lcfg.get("wait_for_launch", False)
+    launch_listener = _LaunchListener(launch_port).start()
+
+    if wait_for_launch:
+        print("STANDBY — waiting for LAUNCH command from laptop monitor...")
+        log.info("STANDBY — waiting for LAUNCH")
+        while not launch_listener.mission_active:
+            if not running[0]:
+                launch_listener.stop()
+                return
+            time.sleep(0.1)
+        print("LAUNCH RECEIVED — starting mission\n")
+        log.info("LAUNCH received — mission start")
 
     if args.video:
         cap = cv2.VideoCapture(args.video)
@@ -97,10 +191,6 @@ def run_mission(args: argparse.Namespace) -> None:
     if not cap.isOpened():
         print("ERROR: could not open camera / video source")
         sys.exit(1)
-
-    running = [True]
-    def _stop(sig, frame): running[0] = False
-    signal.signal(signal.SIGINT, _stop)
 
     # ---- Navigation ----
     if not sim:
@@ -213,6 +303,7 @@ def run_mission(args: argparse.Namespace) -> None:
                 break
 
     finally:
+        launch_listener.stop()
         cap.release()
         csv_f.close()
         cv2.destroyAllWindows()
@@ -240,7 +331,9 @@ if __name__ == "__main__":
     parser.add_argument("--lon",    type=float, default=46.6753)
     parser.add_argument("--camera", type=int,   default=0)
     parser.add_argument("--video",  default=None)
-    parser.add_argument("--sim",    action="store_true", help="Skip GPS")
+    parser.add_argument("--sim",          action="store_true", help="Skip GPS")
+    parser.add_argument("--wait-launch",  action="store_true",
+                        help="Hold in STANDBY until laptop sends LAUNCH command")
     parser.add_argument("--config", default=str(_ROOT / "config.yaml"))
     args = parser.parse_args()
     run_mission(args)
