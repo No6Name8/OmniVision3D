@@ -452,6 +452,60 @@ and inference engine (predictor, visualizer). All passing.
 
 ---
 
+## Friendly Fire Prevention — Deconfliction Theory
+
+When multiple interceptor drones launch together
+each one runs OmniVision3D independently.
+Without a safety system each drone could detect
+its teammates and attempt to intercept them.
+
+Our approach is GPS-based deconfliction:
+
+**BEFORE LAUNCH:**
+The command center sends each drone a deconfliction
+manifest — a list of the GPS coordinates and flight
+paths of all other friendly drones in the mission.
+No signal is broadcast during flight.
+
+**DURING FLIGHT:**
+Before committing to LOCKED state the drone
+calculates the estimated GPS position of the
+detected object using its own GPS position,
+compass heading, camera field of view, and
+the object's position in the frame.
+
+This estimated position is compared against
+the expected positions of all friendly drones
+at this exact moment in time.
+
+If the detected object is within 20 meters of
+a known friendly position the target is skipped
+and the drone returns to SCANNING.
+
+**WHY THIS CANNOT BE JAMMED:**
+Traditional IFF systems broadcast a radio signal.
+Jamming that signal makes all drones look like
+threats. Our system broadcasts nothing during flight.
+There is no signal to jam. The deconfliction data
+was loaded before launch and exists only as a file
+on each drone's local storage. An enemy cannot
+interfere with math.
+
+**WHY THIS CANNOT BE SPOOFED:**
+Traditional IFF systems can be spoofed by
+broadcasting a fake friendly signal. Our system
+accepts no signals during flight. A fake broadcast
+would be ignored completely.
+
+**CURRENT STATUS:**
+Deconfliction logic is designed and documented.
+Full implementation requires live GPS and compass
+integration with the Pixhawk flight controller.
+This is planned for the next hardware integration
+phase after motors and ESCs are installed.
+
+---
+
 ## Roadmap
 
 - **MAVLink flight controller wiring** — replace PID stubs with RC-override commands
