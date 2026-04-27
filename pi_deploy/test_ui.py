@@ -23,7 +23,6 @@ import yaml
 _ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(_ROOT))
 
-from vision.camera_stream  import CameraStream
 from vision.frame_enhancer import FrameEnhancer
 from vision.pipeline       import VisionPipeline, Phase
 from control.tracker       import TrackState
@@ -195,6 +194,85 @@ def build_status_panel(result, track_state, lost_secs: float,
 # Main
 # ---------------------------------------------------------------------------
 
+def _scan_cameras(max_index: int = 6) -> list:
+    """Return list of (index, cap) for every camera that opens successfully."""
+    found = []
+    for i in range(max_index):
+        cap = cv2.VideoCapture(i + cv2.CAP_DSHOW)
+        if cap.isOpened():
+            ret, _ = cap.read()
+            if ret:
+                found.append((i, cap))
+                continue
+        cap.release()
+    return found
+
+
+def pick_camera() -> int:
+    """
+    Show a live preview of every detected camera.
+    User presses the displayed number key to select one.
+    Returns the chosen camera index.
+    """
+    print("Scanning for cameras...")
+    cameras = _scan_cameras()
+
+    if not cameras:
+        print("No cameras found — defaulting to index 0")
+        return 0
+
+    if len(cameras) == 1:
+        idx, cap = cameras[0]
+        cap.release()
+        print(f"One camera found: index {idx}")
+        return idx
+
+    font   = cv2.FONT_HERSHEY_SIMPLEX
+    chosen = None
+
+    cv2.namedWindow("Select Camera", cv2.WINDOW_NORMAL)
+
+    while chosen is None:
+        tiles = []
+        for idx, cap in cameras:
+            ret, frame = cap.read()
+            if not ret or frame is None:
+                frame = np.zeros((240, 320, 3), dtype=np.uint8)
+            tile = cv2.resize(frame, (320, 240))
+            label = f"Press {idx}  (Camera {idx})"
+            cv2.rectangle(tile, (0, 0), (320, 36), (30, 30, 30), -1)
+            cv2.putText(tile, label, (8, 26), font, 0.7, (0, 220, 220), 2, cv2.LINE_AA)
+            tiles.append(tile)
+
+        # Lay out tiles in a row
+        row = np.hstack(tiles)
+        w = row.shape[1]
+        info = np.zeros((50, w, 3), dtype=np.uint8)
+        cv2.putText(info, "Press the number key to select your camera   |   ESC = use camera 0",
+                    (10, 34), font, 0.6, (180, 180, 180), 1, cv2.LINE_AA)
+        combined = np.vstack([row, info])
+
+        cv2.imshow("Select Camera", combined)
+
+        if cv2.getWindowProperty("Select Camera", cv2.WND_PROP_VISIBLE) < 1:
+            chosen = cameras[0][0]
+            break
+
+        key = cv2.waitKey(30) & 0xFF
+        if key == 27:                          # ESC → use first camera
+            chosen = cameras[0][0]
+        elif chr(key).isdigit():
+            num = int(chr(key))
+            if any(i == num for i, _ in cameras):
+                chosen = num
+
+    for _, cap in cameras:
+        cap.release()
+    cv2.destroyWindow("Select Camera")
+    print(f"Camera {chosen} selected.")
+    return chosen
+
+
 def _startup_banner() -> None:
     lines = [
         "=" * 36,
@@ -216,43 +294,48 @@ def _startup_banner() -> None:
 
 def run(args: argparse.Namespace) -> None:
     _startup_banner()
-    time.sleep(2.0)
 
     cfg = yaml.safe_load(open(_ROOT / "config.yaml"))
     cfg["_root"] = str(_ROOT)
 
-    enhancer = FrameEnhancer()
+    enhancer = FrameEnhancer(enable=False)
     pipeline = VisionPipeline(cfg)
 
     log: deque = deque(maxlen=20)
 
-    # ---- Open video / camera ----
+    # ---- Open video / camera (direct capture — no subprocess spin) ----
     if args.video:
         cap = cv2.VideoCapture(args.video)
-        cam_fps_val = 0.0
-        use_stream  = False
     else:
-        stream = CameraStream(camera_index=args.camera).start()
-        cap    = None
-        use_stream = True
-        cam_fps_val = 0.0
+        camera_index = args.camera if args.camera is not None else pick_camera()
+        cap = cv2.VideoCapture(camera_index + cv2.CAP_DSHOW)
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH,  640)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        cap.set(cv2.CAP_PROP_BUFFERSIZE,   1)
+
+    if not cap.isOpened():
+        print(f"ERROR: could not open camera {args.camera}")
+        return
+
+    cv2.namedWindow("OmniVision3D", cv2.WINDOW_NORMAL)
 
     track_state = TrackState.SEARCHING
     lost_secs   = 0.0
+    fps_times: deque = deque(maxlen=30)
+    t_last = time.perf_counter()
 
     while True:
-        if use_stream:
-            frame = stream.read()
-            cam_fps_val = stream.get_fps()
-        else:
-            ret, frame = cap.read()
-            if not ret:
-                break
+        ret, frame = cap.read()
+        if not ret:
+            break
 
-        if frame is None:
-            continue
+        # FPS counter
+        now = time.perf_counter()
+        fps_times.append(now - t_last)
+        t_last = now
+        cam_fps_val = len(fps_times) / max(sum(fps_times), 1e-6)
 
-        enhanced = enhancer.enhance(frame.copy())
+        enhanced = enhancer.enhance(frame)
         result   = pipeline.process_frame(enhanced)
 
         # Derive simple track state from phase for display
@@ -264,9 +347,9 @@ def run(args: argparse.Namespace) -> None:
             if track_state != TrackState.SEARCHING:
                 track_state = TrackState.SEARCHING
         elif result.phase == Phase.CONFIRMING:
-            track_state = TrackState.LOCKED  # show active detection colour
+            track_state = TrackState.LOCKED
             lost_secs   = 0.0
-        else:  # SCANNING
+        else:
             track_state = TrackState.SEARCHING
             lost_secs   = 0.0
 
@@ -285,39 +368,38 @@ def run(args: argparse.Namespace) -> None:
             r = result.identity.required    if result.identity else 3
             log.append(f"{now_str} CONF {n}/{r}")
 
-        overlay = draw_camera_overlay(frame.copy(), result, track_state, lost_secs)
+        overlay = draw_camera_overlay(frame, result, track_state, lost_secs)
         panel   = build_status_panel(result, track_state, lost_secs, cam_fps_val, log)
 
         combined = np.hstack([overlay, panel])
         cv2.imshow("OmniVision3D", combined)
 
         key = cv2.waitKey(1) & 0xFF
-        if key == ord("q"):
+        if key == ord("q") or key == 27:   # Q or ESC
             break
-        if key == ord("e"):
+        if cv2.getWindowProperty("OmniVision3D", cv2.WND_PROP_VISIBLE) < 1:
+            break
+        elif key == ord("e"):
             state = enhancer.toggle()
             print(f"Enhancement: {'ON' if state else 'OFF'}")
-        if key == ord("r"):
+        elif key == ord("r"):
             pipeline.reset()
             log.clear()
             track_state = TrackState.SEARCHING
             print("Pipeline reset")
-        if key == ord("s"):
+        elif key == ord("s"):
             fname = f"screenshot_{time.time():.0f}.png"
             cv2.imwrite(fname, overlay)
             print(f"Screenshot saved: {fname}")
 
-    if use_stream:
-        stream.stop()
-    elif cap is not None:
-        cap.release()
+    cap.release()
     cv2.destroyAllWindows()
 
 
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="OmniVision3D test UI")
-    parser.add_argument("--camera", type=int, default=0)
+    parser.add_argument("--camera", type=int, default=None)
     parser.add_argument("--video",  default=None)
     args = parser.parse_args()
     run(args)

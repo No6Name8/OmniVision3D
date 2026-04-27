@@ -41,7 +41,7 @@ class YoloDetector:
         input_size:     int   = 512,
     ) -> None:
         opts = ort.SessionOptions()
-        opts.intra_op_num_threads          = max(4, os.cpu_count() or 4)
+        opts.intra_op_num_threads          = 2
         opts.inter_op_num_threads          = 1
         opts.graph_optimization_level      = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
         opts.execution_mode                = ort.ExecutionMode.ORT_SEQUENTIAL

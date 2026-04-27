@@ -64,7 +64,10 @@ def _camera_worker(
     shm = shared_memory.SharedMemory(name=shm_name)
     buf = np.ndarray((height, width, 3), dtype=np.uint8, buffer=shm.buf)
 
-    cap = cv2.VideoCapture(index)
+    import sys as _sys
+    # On Windows MSMF fails in subprocess; DirectShow is reliable
+    _backend = cv2.CAP_DSHOW if _sys.platform == "win32" else 0
+    cap = cv2.VideoCapture(index + _backend)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH,  width)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
     cap.set(cv2.CAP_PROP_FPS,          fps)
