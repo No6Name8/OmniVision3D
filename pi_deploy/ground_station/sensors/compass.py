@@ -68,5 +68,5 @@ def thread_compass(port: str, baud: int = 9600) -> None:
                         with ss.lock():
                             ss.state.compass_raw = heading
         except Exception as e:
-            print(f"[Compass] error: {e} — retrying in 3s")
+            print(f"[Compass] error: {e} - retrying in 3s")
             time.sleep(3)

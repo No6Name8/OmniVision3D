@@ -121,5 +121,5 @@ def thread_gps(
                             pass
 
         except Exception as e:
-            print(f"[GPS] error: {e} — retrying in 3s")
+            print(f"[GPS] error: {e} - retrying in 3s")
             time.sleep(3)

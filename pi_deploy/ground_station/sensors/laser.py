@@ -83,5 +83,5 @@ def thread_laser(
                     if period > 0:
                         time.sleep(period)
         except Exception as e:
-            print(f"[Laser] error: {e} — retrying in 3s")
+            print(f"[Laser] error: {e} - retrying in 3s")
             time.sleep(3)
