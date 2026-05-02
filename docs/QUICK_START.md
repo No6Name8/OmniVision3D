@@ -193,21 +193,28 @@ python main.py --wait-launch                  # hold until laptop sends LAUNCH
 ### Unit 1 — Ground detection Pi
 
 ```bash
-cd ground_detection/
-python detect.py --laptop <LAPTOP_IP> --model vision/yolo_dji.onnx
+cd ~/omnivision3d/pi_deploy
+python ground_station/main.py \
+    --camera 0 \
+    --model  vision/yolo_dji.onnx \
+    --gps    /dev/serial/by-id/usb-FTDI_...-BG01OJPV-if00-port0 \
+    --laser  /dev/serial/by-id/usb-1a86_USB_Serial-if00-port0 \
+    --compass /dev/serial/by-id/usb-FTDI_...-AQ045IV6-if00-port0 \
+    --declination 4.0
 ```
 
-Watches the sky. Sends UDP alert to laptop on port 5555 when a drone is detected for 3+ consecutive frames.
+Opens Tkinter UI showing live sensor values and YOLO camera feed. Sends UDP alert to laptop (port 5555) when drone is detected for 3+ consecutive frames. Omit `--gps`, `--laser`, or `--compass` to disable individual sensors.
 
 ### Unit 2 — Laptop monitor
 
 ```bash
 cd laptop_monitor/
-python monitor.py --interceptor <INTERCEPTOR_PI_IP>
+python monitor.py --drone <INTERCEPTOR_PI_IP>
+python monitor.py --sim                         # simulation (commands to localhost)
 ```
 
-Receives alerts from ground Pi (port 5555). Displays confidence and compass heading.
-- **ENTER** — send LAUNCH to interceptor Pi
+Receives alerts from ground Pi on port 5555. Displays confidence and compass heading.
+- **ENTER** — send LAUNCH to interceptor Pi (port 5556)
 - **A** — send ABORT
 - **Q** — quit
 
@@ -215,7 +222,9 @@ Receives alerts from ground Pi (port 5555). Displays confidence and compass head
 
 ```bash
 cd ~/omnivision3d
-python drone_main.py --sim      # or main.py --wait-launch for full pipeline
+python drone_main.py            # lean flight (reads config.yaml for simulation_mode)
+python drone_main.py --sim      # force simulation mode
+python main.py --wait-launch    # full pipeline — holds until laptop sends LAUNCH
 ```
 
 Waits for LAUNCH command on port 5556, then begins scanning and intercept loop.
