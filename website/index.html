@@ -1,0 +1,1130 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>زرقاء اليمامة وسهم — منظومة الاعتراض الذاتي</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+
+  <style>
+    /* ── Base ── */
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Noto Kufi Arabic', sans-serif;
+      background-color: #020617;
+      color: #e2e8f0;
+      overflow-x: hidden;
+    }
+
+    /* ── Tailwind custom config ── */
+    :root {
+      --cyan:    #06b6d4;
+      --emerald: #10b981;
+      --slate-950: #020617;
+      --slate-900: #0f172a;
+      --slate-800: #1e293b;
+      --slate-700: #334155;
+      --slate-400: #94a3b8;
+      --slate-300: #cbd5e1;
+    }
+
+    /* ── Scanline overlay ── */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        to bottom,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.02) 2px,
+        rgba(0,0,0,0.02) 4px
+      );
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* ── Radar sweep ── */
+    .radar-container {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      z-index: 0;
+    }
+    .radar-bg {
+      position: relative;
+      width: min(700px, 100vw);
+      height: min(700px, 100vw);
+    }
+    /* Concentric circles */
+    .radar-bg::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at center,
+          transparent 19%,
+          rgba(6,182,212,0.06) 20%,
+          transparent 20.5%,
+          transparent 34%,
+          rgba(6,182,212,0.05) 35%,
+          transparent 35.5%,
+          transparent 49%,
+          rgba(6,182,212,0.04) 50%,
+          transparent 50.5%,
+          transparent 64%,
+          rgba(6,182,212,0.04) 65%,
+          transparent 65.5%,
+          transparent 79%,
+          rgba(6,182,212,0.03) 80%,
+          transparent 80.5%
+        );
+    }
+    /* Cross-hairs */
+    .radar-bg::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(to right, transparent 49.8%, rgba(6,182,212,0.06) 50%, transparent 50.2%),
+        linear-gradient(to bottom, transparent 49.8%, rgba(6,182,212,0.06) 50%, transparent 50.2%);
+    }
+    .radar-sweep {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: conic-gradient(
+        from 0deg,
+        transparent 0deg,
+        transparent 330deg,
+        rgba(6,182,212,0.03) 340deg,
+        rgba(6,182,212,0.18) 355deg,
+        rgba(6,182,212,0.28) 360deg
+      );
+      animation: radar-sweep 4s linear infinite;
+      transform-origin: center center;
+    }
+    @keyframes radar-sweep {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+
+    /* Hero radial glow */
+    .hero-glow {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(ellipse at center,
+        rgba(6,182,212,0.08) 0%,
+        transparent 70%
+      );
+      pointer-events: none;
+    }
+
+    /* ── Drone silhouette ── */
+    .drone-silhouette {
+      animation: float 5s ease-in-out infinite;
+      filter: drop-shadow(0 0 18px rgba(6,182,212,0.55));
+    }
+    @keyframes float {
+      0%,100% { transform: translateY(0px); }
+      50%      { transform: translateY(-20px); }
+    }
+
+    /* ── Glow pulse CTA ── */
+    @keyframes glow-pulse {
+      0%,100% { box-shadow: 0 0 20px rgba(6,182,212,0.55); }
+      50%      { box-shadow: 0 0 40px rgba(6,182,212,1), 0 0 60px rgba(6,182,212,0.28); }
+    }
+    .cta-btn {
+      animation: glow-pulse 2.5s ease-in-out infinite;
+    }
+
+    /* ── Glass cards ── */
+    .glass {
+      background: rgba(15,23,42,0.65);
+      border: 1px solid rgba(6,182,212,0.18);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .glass:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 32px rgba(6,182,212,0.22);
+    }
+
+    /* ── Fade-in on scroll ── */
+    .fade-in {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: opacity 0.7s ease, transform 0.7s ease;
+    }
+    .fade-in.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ── Section divider ── */
+    .section-divider {
+      height: 1px;
+      background: linear-gradient(to left, transparent, rgba(6,182,212,0.35), transparent);
+      margin: 0 auto;
+      max-width: 700px;
+    }
+
+    /* ── Stat number ── */
+    .stat-num {
+      font-size: clamp(2.5rem, 6vw, 4.5rem);
+      font-weight: 900;
+      color: var(--cyan);
+      line-height: 1;
+      letter-spacing: -0.02em;
+    }
+
+    /* ── Icon ring ── */
+    .icon-ring {
+      width: 3.5rem;
+      height: 3.5rem;
+      border-radius: 50%;
+      background: rgba(6,182,212,0.1);
+      border: 1px solid rgba(6,182,212,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    /* ── Emerald icon ring ── */
+    .icon-ring-em {
+      background: rgba(16,185,129,0.1);
+      border: 1px solid rgba(16,185,129,0.3);
+    }
+
+    /* ── Section title underline ── */
+    .title-underline {
+      display: inline-block;
+      position: relative;
+    }
+    .title-underline::after {
+      content: '';
+      position: absolute;
+      bottom: -6px;
+      right: 0;
+      left: 0;
+      height: 3px;
+      background: linear-gradient(to left, var(--cyan), transparent);
+      border-radius: 2px;
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: fixed;
+      top: 0;
+      right: 0;
+      left: 0;
+      z-index: 100;
+      background: rgba(2,6,23,0.82);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(6,182,212,0.1);
+    }
+
+    /* ── Blinking dot ── */
+    @keyframes blink {
+      0%,100% { opacity: 1; }
+      50%      { opacity: 0.2; }
+    }
+    .blink { animation: blink 1.4s ease-in-out infinite; }
+
+    /* ── Partner badge ── */
+    .partner-badge {
+      background: rgba(6,182,212,0.08);
+      border: 1px solid rgba(6,182,212,0.22);
+      border-radius: 6px;
+      padding: 0.5rem 1.2rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--cyan);
+      white-space: nowrap;
+    }
+
+    /* ── Intercept line animation ── */
+    @keyframes dash-move {
+      to { stroke-dashoffset: -40; }
+    }
+
+    /* ── Responsive helpers ── */
+    @media (max-width: 640px) {
+      .stat-num { font-size: 2.4rem; }
+    }
+  </style>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            cyan:    { DEFAULT: '#06b6d4', 400: '#22d3ee', 500: '#06b6d4', 600: '#0891b2' },
+            emerald: { DEFAULT: '#10b981', 400: '#34d399', 500: '#10b981' },
+          }
+        }
+      }
+    }
+  </script>
+</head>
+
+<body class="bg-slate-950 text-white">
+
+  <!-- ════════════════════════════════════════════
+       NAVIGATION
+  ════════════════════════════════════════════ -->
+  <nav>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
+      <!-- Logo -->
+      <div class="flex items-center gap-2">
+        <span class="blink text-cyan-500">
+          <i class="fa-solid fa-circle text-xs"></i>
+        </span>
+        <span class="text-cyan-400 font-bold text-sm tracking-wide">زرقاء اليمامة وسهم</span>
+      </div>
+      <!-- Nav links — hidden on mobile -->
+      <div class="hidden md:flex items-center gap-6 text-sm text-slate-400">
+        <a href="#problem"   class="hover:text-cyan-400 transition-colors">المشكلة</a>
+        <a href="#detection" class="hover:text-cyan-400 transition-colors">الكشف</a>
+        <a href="#interceptor" class="hover:text-cyan-400 transition-colors">المعترض</a>
+        <a href="#impact"    class="hover:text-cyan-400 transition-colors">الأثر</a>
+        <a href="#contact"   class="hover:text-cyan-400 transition-colors">التواصل</a>
+      </div>
+      <!-- Status pill -->
+      <div class="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/25 rounded-full px-3 py-1">
+        <span class="blink text-emerald-400 text-xs"><i class="fa-solid fa-circle"></i></span>
+        <span class="text-emerald-400 text-xs font-semibold">النظام نشط</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ════════════════════════════════════════════
+       SECTION 1 — HERO
+  ════════════════════════════════════════════ -->
+  <section class="relative min-h-screen flex flex-col items-center justify-center overflow-hidden pt-14">
+
+    <!-- Radar sweep background -->
+    <div class="radar-container">
+      <div class="radar-bg">
+        <div class="radar-sweep"></div>
+      </div>
+    </div>
+
+    <!-- Radial glow -->
+    <div class="hero-glow"></div>
+
+    <!-- Content -->
+    <div class="relative z-10 text-center px-4 sm:px-6 max-w-5xl mx-auto">
+
+      <!-- System tag -->
+      <div class="inline-flex items-center gap-2 bg-cyan-500/10 border border-cyan-500/25 rounded-full px-4 py-1.5 mb-8 text-cyan-400 text-xs font-semibold tracking-widest uppercase fade-in">
+        <i class="fa-solid fa-shield-halved"></i>
+        <span>منظومة دفاع جوي — صنع سعودي</span>
+      </div>
+
+      <!-- Main headline -->
+      <h1 class="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black leading-tight mb-4 fade-in" style="transition-delay:0.1s">
+        منظومة<br>
+        <span class="text-cyan-400">زرقاء اليمامة</span><br>
+        <span class="text-slate-300 font-light text-3xl sm:text-4xl md:text-5xl">وسهم</span>
+      </h1>
+
+      <!-- Subheadline -->
+      <p class="text-xl sm:text-2xl md:text-3xl font-bold text-emerald-400 mb-3 fade-in" style="transition-delay:0.2s">
+        حل سعودي سيادي لتحدٍّ سعودي
+      </p>
+
+      <!-- Tagline -->
+      <p class="text-base sm:text-lg text-slate-400 max-w-2xl mx-auto mb-10 fade-in" style="transition-delay:0.3s">
+        نظام دفاع جوي ذاتي القرار ضد الطائرات المسيّرة — يكشف، يقفل، يعترض
+      </p>
+
+      <!-- Drone SVG silhouette -->
+      <div class="flex justify-center mb-10 fade-in" style="transition-delay:0.35s">
+        <svg class="drone-silhouette" width="200" height="120" viewBox="0 0 200 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Body -->
+          <rect x="82" y="50" width="36" height="20" rx="4" fill="#06b6d4" opacity="0.9"/>
+          <!-- Arms -->
+          <line x1="100" y1="60" x2="30" y2="30"  stroke="#06b6d4" stroke-width="3" stroke-linecap="round"/>
+          <line x1="100" y1="60" x2="170" y2="30" stroke="#06b6d4" stroke-width="3" stroke-linecap="round"/>
+          <line x1="100" y1="60" x2="30" y2="90"  stroke="#06b6d4" stroke-width="3" stroke-linecap="round"/>
+          <line x1="100" y1="60" x2="170" y2="90" stroke="#06b6d4" stroke-width="3" stroke-linecap="round"/>
+          <!-- Motor pods -->
+          <circle cx="30"  cy="30"  r="10" fill="#0e7490" stroke="#06b6d4" stroke-width="1.5"/>
+          <circle cx="170" cy="30"  r="10" fill="#0e7490" stroke="#06b6d4" stroke-width="1.5"/>
+          <circle cx="30"  cy="90"  r="10" fill="#0e7490" stroke="#06b6d4" stroke-width="1.5"/>
+          <circle cx="170" cy="90"  r="10" fill="#0e7490" stroke="#06b6d4" stroke-width="1.5"/>
+          <!-- Propellers -->
+          <ellipse cx="30"  cy="30"  rx="18" ry="3" fill="#06b6d4" opacity="0.4" transform="rotate(-30 30 30)"/>
+          <ellipse cx="170" cy="30"  rx="18" ry="3" fill="#06b6d4" opacity="0.4" transform="rotate(30 170 30)"/>
+          <ellipse cx="30"  cy="90"  rx="18" ry="3" fill="#06b6d4" opacity="0.4" transform="rotate(30 30 90)"/>
+          <ellipse cx="170" cy="90"  rx="18" ry="3" fill="#06b6d4" opacity="0.4" transform="rotate(-30 170 90)"/>
+          <!-- Camera lens -->
+          <circle cx="100" cy="60" r="5" fill="#020617" stroke="#06b6d4" stroke-width="1.5"/>
+          <circle cx="100" cy="60" r="2.5" fill="#06b6d4" opacity="0.7"/>
+          <!-- Intercept vector -->
+          <line x1="100" y1="60" x2="100" y2="10" stroke="#10b981" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.8">
+            <animate attributeName="stroke-dashoffset" from="0" to="-28" dur="1.2s" repeatCount="indefinite"/>
+          </line>
+          <!-- Lock reticle -->
+          <circle cx="100" cy="8" r="5" stroke="#10b981" stroke-width="1.5" fill="none" opacity="0.85"/>
+          <line x1="97" y1="8" x2="93" y2="8" stroke="#10b981" stroke-width="1.5"/>
+          <line x1="103" y1="8" x2="107" y2="8" stroke="#10b981" stroke-width="1.5"/>
+          <line x1="100" y1="5" x2="100" y2="1" stroke="#10b981" stroke-width="1.5"/>
+          <line x1="100" y1="11" x2="100" y2="15" stroke="#10b981" stroke-width="1.5"/>
+        </svg>
+      </div>
+
+      <!-- CTA Button -->
+      <a id="cta-btn" href="#problem"
+        class="cta-btn inline-flex items-center gap-3 bg-cyan-500/15 border-2 border-cyan-500 text-cyan-300 font-bold px-8 py-4 rounded-lg text-lg hover:bg-cyan-500/25 transition-colors cursor-pointer fade-in"
+        style="transition-delay:0.45s">
+        <span>استكشف التقنية</span>
+        <i class="fa-solid fa-arrow-down"></i>
+      </a>
+
+      <!-- Three quick stats below CTA -->
+      <div class="mt-14 grid grid-cols-3 gap-4 max-w-lg mx-auto fade-in" style="transition-delay:0.55s">
+        <div class="text-center">
+          <div class="text-2xl font-black text-cyan-400">37 FPS</div>
+          <div class="text-xs text-slate-500 mt-0.5">معدل الكشف</div>
+        </div>
+        <div class="text-center border-x border-slate-700/60">
+          <div class="text-2xl font-black text-emerald-400">99.5%</div>
+          <div class="text-xs text-slate-500 mt-0.5">دقة الرصد</div>
+        </div>
+        <div class="text-center">
+          <div class="text-2xl font-black text-cyan-400">3 إطارات</div>
+          <div class="text-xs text-slate-500 mt-0.5">للإقفال</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scroll indicator -->
+    <div class="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 text-slate-600 text-xs">
+      <span>مرر للأسفل</span>
+      <i class="fa-solid fa-chevron-down animate-bounce"></i>
+    </div>
+  </section>
+
+  <div class="section-divider"></div>
+
+  <!-- ════════════════════════════════════════════
+       SECTION 2 — THE PROBLEM
+  ════════════════════════════════════════════ -->
+  <section id="problem" class="py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+
+    <!-- Section header -->
+    <div class="text-center mb-16 fade-in">
+      <p class="text-cyan-500 text-sm font-semibold uppercase tracking-widest mb-3">
+        <i class="fa-solid fa-triangle-exclamation mr-1"></i>
+        حسابات الحرب الحديثة
+      </p>
+      <h2 class="text-3xl sm:text-4xl md:text-5xl font-black mb-4">
+        <span class="title-underline">المعادلة الاقتصادية المختلة</span>
+      </h2>
+      <p class="text-slate-400 max-w-xl mx-auto text-base sm:text-lg">
+        لا يمكن الفوز بحرب الطائرات المسيّرة بمنظومات صُممت لحقبة مختلفة
+      </p>
+    </div>
+
+    <!-- Big stat callouts -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-16">
+
+      <div class="glass rounded-2xl p-8 text-center fade-in" style="transition-delay:0.05s">
+        <div class="text-xs text-slate-500 uppercase tracking-widest mb-2">سعر الهجوم</div>
+        <div class="stat-num mb-2">20,000</div>
+        <div class="text-slate-300 font-semibold text-lg">دولار</div>
+        <div class="text-slate-500 text-sm mt-2">طائرة شاهد الانتحارية</div>
+      </div>
+
+      <div class="glass rounded-2xl p-8 text-center fade-in relative overflow-hidden" style="transition-delay:0.1s">
+        <!-- Red warning overlay -->
+        <div class="absolute inset-0 bg-red-500/5 pointer-events-none rounded-2xl"></div>
+        <div class="text-xs text-slate-500 uppercase tracking-widest mb-2">سعر الدفاع</div>
+        <div class="stat-num mb-2" style="color:#f87171">3,000,000</div>
+        <div class="text-slate-300 font-semibold text-lg">دولار</div>
+        <div class="text-slate-500 text-sm mt-2">صاروخ باتريوت PAC-3</div>
+      </div>
+
+      <div class="glass rounded-2xl p-8 text-center fade-in" style="transition-delay:0.15s">
+        <div class="text-xs text-slate-500 uppercase tracking-widest mb-2">نسبة الخسارة</div>
+        <div class="stat-num mb-2" style="color:#fb923c">150:1</div>
+        <div class="text-slate-300 font-semibold text-lg">لصالح المهاجم</div>
+        <div class="text-slate-500 text-sm mt-2">كل طائرة رخيصة تُكلّف أضعافها دفاعاً</div>
+      </div>
+    </div>
+
+    <!-- Problem cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+      <div class="glass rounded-xl p-6 fade-in" style="transition-delay:0.2s">
+        <div class="icon-ring mb-4" style="background:rgba(239,68,68,0.1);border-color:rgba(239,68,68,0.3);">
+          <i class="fa-solid fa-eye-slash text-red-400 text-lg"></i>
+        </div>
+        <h3 class="font-bold text-lg mb-2">التهرب من الرادار</h3>
+        <p class="text-slate-400 text-sm leading-relaxed">
+          الطائرات المسيّرة المنخفضة التحليق تطير تحت ارتفاع 150 متر — أقل من مستوى الكشف الراداري التقليدي بمراحل. رادارات باتريوت لم تُصمم لهذا التهديد.
+        </p>
+      </div>
+
+      <div class="glass rounded-xl p-6 fade-in" style="transition-delay:0.25s">
+        <div class="icon-ring mb-4" style="background:rgba(251,146,60,0.1);border-color:rgba(251,146,60,0.3);">
+          <i class="fa-solid fa-swarm text-orange-400 text-lg" style="font-family:monospace;font-style:normal">&#xe51f;</i>
+          <i class="fa-solid fa-layer-group text-orange-400 text-lg"></i>
+        </div>
+        <h3 class="font-bold text-lg mb-2">إرهاق الأسراب</h3>
+        <p class="text-slate-400 text-sm leading-relaxed">
+          عشر طائرات مسيّرة تُطلق في وقت واحد تستنزف كل صواريخ بطارية دفاع كاملة قبل أن تصل الطائرة الحقيقية. التشبع التكتيكي سلاح اقتصادي بامتياز.
+        </p>
+      </div>
+
+      <div class="glass rounded-xl p-6 fade-in" style="transition-delay:0.3s">
+        <div class="icon-ring mb-4" style="background:rgba(250,204,21,0.1);border-color:rgba(250,204,21,0.3);">
+          <i class="fa-solid fa-sack-dollar text-yellow-400 text-lg"></i>
+        </div>
+        <h3 class="font-bold text-lg mb-2">استنزاف الميزانية</h3>
+        <p class="text-slate-400 text-sm leading-relaxed">
+          ميزانية الدفاع محدودة. صاروخ واحد بثلاثة ملايين دولار مقابل طائرة بعشرين ألفاً — العدو يخطط على هذه المعادلة ويُمولها بكل هجوم ناجح.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-divider"></div>
+
+  <!-- ════════════════════════════════════════════
+       SECTION 3 — DETECTION (زرقاء اليمامة)
+  ════════════════════════════════════════════ -->
+  <section id="detection" class="py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+
+    <!-- Section header -->
+    <div class="text-center mb-16 fade-in">
+      <p class="text-cyan-500 text-sm font-semibold uppercase tracking-widest mb-3">
+        <i class="fa-solid fa-eye mr-1"></i>
+        الوحدة الأولى
+      </p>
+      <h2 class="text-3xl sm:text-4xl md:text-5xl font-black mb-4">
+        <span class="title-underline text-cyan-400">زرقاء اليمامة</span>
+      </h2>
+      <p class="text-xl font-semibold text-slate-300 mb-3">عيون لا تُخدع</p>
+      <p class="text-slate-400 max-w-2xl mx-auto text-base sm:text-lg">
+        منظومة كشف هجينة تتجاوز حدود الرادار — كاميرا بصرية وحرارية، مصفوفة صوتية، ومعالجة بالذكاء الاصطناعي على الحافة
+      </p>
+    </div>
+
+    <!-- Architecture diagram -->
+    <div class="glass rounded-2xl p-6 sm:p-8 mb-12 fade-in">
+      <div class="text-xs text-slate-500 uppercase tracking-widest mb-4 text-center">تدفق البيانات — خط الكشف</div>
+      <div class="flex flex-wrap justify-center items-center gap-2 sm:gap-3 text-sm">
+        <div class="bg-slate-800/80 border border-slate-700 rounded-lg px-4 py-2.5 font-semibold">الكاميرا 640×480</div>
+        <i class="fa-solid fa-arrow-left text-cyan-500 text-xs"></i>
+        <div class="bg-cyan-500/10 border border-cyan-500/30 rounded-lg px-4 py-2.5 font-semibold text-cyan-300">YOLOv8n — 18ms</div>
+        <i class="fa-solid fa-arrow-left text-cyan-500 text-xs"></i>
+        <div class="bg-slate-800/80 border border-slate-700 rounded-lg px-4 py-2.5 font-semibold">اقتصاص الهدف</div>
+        <i class="fa-solid fa-arrow-left text-cyan-500 text-xs"></i>
+        <div class="bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-4 py-2.5 font-semibold text-emerald-300">MobileNetV2 — 7ms</div>
+        <i class="fa-solid fa-arrow-left text-cyan-500 text-xs"></i>
+        <div class="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-2.5 font-bold text-red-300">مُقفَّل LOCKED</div>
+      </div>
+      <div class="mt-4 text-center text-xs text-slate-500">
+        إجمالي زمن القرار من الإطار حتى الإقفال: <span class="text-cyan-400 font-semibold">3 إطارات (~80ms)</span>
+      </div>
+    </div>
+
+    <!-- Detection cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+      <!-- Card A: Visual AI Detection -->
+      <div class="glass rounded-2xl p-7 fade-in" style="transition-delay:0.05s">
+        <div class="flex items-center gap-3 mb-5">
+          <div class="icon-ring">
+            <i class="fa-solid fa-eye text-cyan-400 text-lg"></i>
+          </div>
+          <h3 class="font-bold text-lg">الكشف البصري بالذكاء الاصطناعي</h3>
+        </div>
+        <p class="text-slate-400 text-sm leading-relaxed mb-5">
+          كاميرات EO/IR متكاملة مع نموذج YOLO مُحسَّن للتشغيل على Edge AI — بلا سحابة، بلا اتصال خارجي.
+        </p>
+        <div class="space-y-2.5">
+          <div class="flex items-center gap-2 text-sm">
+            <i class="fa-solid fa-check-circle text-emerald-400 text-xs flex-shrink-0"></i>
+            <span class="text-slate-300">دقة <span class="text-cyan-400 font-bold">99.5% mAP50</span> على بيانات حقيقية</span>
+          </div>
+          <div class="flex items-center gap-2 text-sm">
+            <i class="fa-solid fa-check-circle text-emerald-400 text-xs flex-shrink-0"></i>
+            <span class="text-slate-300">0% إيجابيات كاذبة — لا إنذارات زائفة</span>
+          </div>
+          <div class="flex items-center gap-2 text-sm">
+            <i class="fa-solid fa-check-circle text-emerald-400 text-xs flex-shrink-0"></i>
+            <span class="text-slate-300">تعمل نهاراً وليلاً في أي طقس</span>
+          </div>
+          <div class="flex items-center gap-2 text-sm">
+            <i class="fa-solid fa-check-circle text-emerald-400 text-xs flex-shrink-0"></i>
+            <span class="text-slate-300">نموذج حجم <span class="text-cyan-400 font-bold">11.6 MB</span> فقط على الجهاز</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card B: Acoustic array -->
+      <div class="glass rounded-2xl p-7 fade-in" style="transition-delay:0.1s">
+        <div class="flex items-center gap-3 mb-5">
+          <div class="icon-ring">
+            <i class="fa-solid fa-microphone text-cyan-400 text-lg"></i>
+          </div>
+          <h3 class="font-bold text-lg">المصفوفة الصوتية الاتجاهية</h3>
+        </div>
+        <p class="text-slate-400 text-sm leading-relaxed mb-5">
+          تكتشف هدير المحركات الكهربائية للطائرات المسيّرة عبر تحليل طيفي دقيق قبل أن تدخل مدى الرؤية.
+        </p>
+        <div class="space-y-2.5">
+          <div class="flex items-center gap-2 text-sm">
+            <i class="fa-solid fa-check-circle text-emerald-400 text-xs flex-shrink-0"></i>
+            <span class="text-slate-300">الترددات المستهدفة: <span class="text-cyan-400 font-bold">3–8 كيلوهرتز</span></span>
+          </div>
+          <div class="flex items-center gap-2 text-sm">
+            <i class="fa-solid fa-check-circle text-emerald-400 text-xs flex-shrink-0"></i>
+            <span class="text-slate-300">تحديد الاتجاه بدقة <span class="text-cyan-400 font-bold">±2 درجة</span></span>
+          </div>
+          <div class="flex items-center gap-2 text-sm">
+            <i class="fa-solid fa-check-circle text-emerald-400 text-xs flex-shrink-0"></i>
+            <span class="text-slate-300">إنذار مبكر قبل دخول المدى البصري</span>
+          </div>
+          <div class="flex items-center gap-2 text-sm">
+            <i class="fa-solid fa-check-circle text-emerald-400 text-xs flex-shrink-0"></i>
+            <span class="text-slate-300">طبقة دفاع مستقلة عن الكاميرا</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card C: Kinematic tracking -->
+      <div class="glass rounded-2xl p-7 fade-in" style="transition-delay:0.15s">
+        <div class="flex items-center gap-3 mb-5">
+          <div class="icon-ring">
+            <i class="fa-solid fa-crosshairs text-cyan-400 text-lg"></i>
+          </div>
+          <h3 class="font-bold text-lg">التتبع الكينماتيكي ثلاثي الأبعاد</h3>
+        </div>
+        <p class="text-slate-400 text-sm leading-relaxed mb-5">
+          GPS + بوصلة + مقياس ليزر تُدمج في معادلة هافرساين لحساب إحداثيات الهدف بدقة متر واحد.
+        </p>
+        <div class="space-y-2.5">
+          <div class="flex items-center gap-2 text-sm">
+            <i class="fa-solid fa-check-circle text-emerald-400 text-xs flex-shrink-0"></i>
+            <span class="text-slate-300">السمت والارتفاع والمدى المائل</span>
+          </div>
+          <div class="flex items-center gap-2 text-sm">
+            <i class="fa-solid fa-check-circle text-emerald-400 text-xs flex-shrink-0"></i>
+            <span class="text-slate-300">حساب نقطة الاعتراض المتوقعة <span class="text-cyan-400 font-bold">(PIP)</span></span>
+          </div>
+          <div class="flex items-center gap-2 text-sm">
+            <i class="fa-solid fa-check-circle text-emerald-400 text-xs flex-shrink-0"></i>
+            <span class="text-slate-300">اعتراض رياضي لا مطاردة — اقتصاد في الوقود</span>
+          </div>
+          <div class="flex items-center gap-2 text-sm">
+            <i class="fa-solid fa-check-circle text-emerald-400 text-xs flex-shrink-0"></i>
+            <span class="text-slate-300">تنبيه UDP لوحدة الإطلاق فور الإقفال</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Training pipeline highlight -->
+    <div class="mt-12 glass rounded-2xl p-6 sm:p-8 fade-in" style="transition-delay:0.2s">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
+        <div class="icon-ring icon-ring-em flex-shrink-0">
+          <i class="fa-solid fa-flask text-emerald-400 text-lg"></i>
+        </div>
+        <div>
+          <h3 class="font-bold text-lg text-emerald-400">بيانات التدريب — مُولَّدة اصطناعياً بالكامل</h3>
+          <p class="text-slate-400 text-sm">لا حاجة إلى آلاف الصور الميدانية المعلَّمة. نموذج ثلاثي الأبعاد واحد يكفي.</p>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+        <div>
+          <div class="text-2xl font-black text-cyan-400">600</div>
+          <div class="text-xs text-slate-500 mt-1">زاوية تصيير على كرة فيبوناتشي</div>
+        </div>
+        <div>
+          <div class="text-2xl font-black text-cyan-400">1,800</div>
+          <div class="text-xs text-slate-500 mt-1">صورة بمشاهد سماء إجرائية</div>
+        </div>
+        <div>
+          <div class="text-2xl font-black text-cyan-400">1,800</div>
+          <div class="text-xs text-slate-500 mt-1">مكافئ حراري بـ LUT الحديد</div>
+        </div>
+        <div>
+          <div class="text-2xl font-black text-emerald-400">7,200</div>
+          <div class="text-xs text-slate-500 mt-1">إجمالي صور التدريب</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-divider"></div>
+
+  <!-- ════════════════════════════════════════════
+       SECTION 4 — INTERCEPTOR (سهم)
+  ════════════════════════════════════════════ -->
+  <section id="interceptor" class="py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+
+    <!-- Section header -->
+    <div class="text-center mb-16 fade-in">
+      <p class="text-cyan-500 text-sm font-semibold uppercase tracking-widest mb-3">
+        <i class="fa-solid fa-bolt mr-1"></i>
+        الوحدة الثانية
+      </p>
+      <h2 class="text-3xl sm:text-4xl md:text-5xl font-black mb-4">
+        <span class="title-underline text-emerald-400">سهم</span>
+      </h2>
+      <p class="text-xl font-semibold text-slate-300 mb-3">ضربة واحدة كافية</p>
+      <p class="text-slate-400 max-w-2xl mx-auto text-base sm:text-lg">
+        طائرة اعتراضية ذاتية التوجيه — تُطلق، تُقفل، تعترض. بدون مشغّل، بدون اتصال، بدون رحمة
+      </p>
+    </div>
+
+    <!-- Feature cards — 2-col then 3-col grid -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+
+      <!-- Card 1: Radio silence -->
+      <div class="glass rounded-2xl p-7 fade-in" style="transition-delay:0.05s">
+        <div class="flex items-center gap-3 mb-5">
+          <div class="icon-ring" style="background:rgba(239,68,68,0.1);border-color:rgba(239,68,68,0.3)">
+            <i class="fa-solid fa-wifi text-red-400 text-lg" style="position:relative">
+              <i class="fa-solid fa-slash" style="position:absolute;inset:0;font-size:0.65em;display:flex;align-items:center;justify-content:center;color:rgba(239,68,68,0.85)"></i>
+            </i>
+          </div>
+          <h3 class="font-bold text-lg">الصمت الراديوي بعد الإطلاق</h3>
+        </div>
+        <p class="text-slate-400 text-sm leading-relaxed mb-5">
+          فور الانطلاق يُقطع كل اتصال لاسلكي. لا إشارة تُرسَل ولا تُستقبَل.
+        </p>
+        <div class="space-y-2">
+          <div class="flex items-center gap-2 text-sm">
+            <i class="fa-solid fa-shield text-emerald-400 text-xs"></i>
+            <span class="text-slate-300">لا إشارة = لا تشويش = لا خداع GPS</span>
+          </div>
+          <div class="flex items-center gap-2 text-sm">
+            <i class="fa-solid fa-shield text-emerald-400 text-xs"></i>
+            <span class="text-slate-300">مناعة كاملة ضد الحرب الإلكترونية</span>
+          </div>
+          <div class="flex items-center gap-2 text-sm">
+            <i class="fa-solid fa-shield text-emerald-400 text-xs"></i>
+            <span class="text-slate-300">بيانات التفييف محملة قبل الإقلاع</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: Visual chase -->
+      <div class="glass rounded-2xl p-7 fade-in" style="transition-delay:0.1s">
+        <div class="flex items-center gap-3 mb-5">
+          <div class="icon-ring">
+            <i class="fa-solid fa-camera text-cyan-400 text-lg"></i>
+          </div>
+          <h3 class="font-bold text-lg">المطاردة البصرية المستقلة</h3>
+        </div>
+        <p class="text-slate-400 text-sm leading-relaxed mb-5">
+          بعد الإقفال يتولى نظام PID المزدوج توجيه 4 محركات نحو مركز الهدف في الإطار.
+        </p>
+        <div class="space-y-2">
+          <div class="flex items-center gap-2 text-sm">
+            <i class="fa-solid fa-gauge-high text-cyan-400 text-xs"></i>
+            <span class="text-slate-300"><span class="text-cyan-400 font-bold">37 إطار/ثانية</span> في وضع المسح</span>
+          </div>
+          <div class="flex items-center gap-2 text-sm">
+            <i class="fa-solid fa-gauge-high text-cyan-400 text-xs"></i>
+            <span class="text-slate-300"><span class="text-cyan-400 font-bold">61 إطار/ثانية</span> بعد الإقفال</span>
+          </div>
+          <div class="flex items-center gap-2 text-sm">
+            <i class="fa-solid fa-gauge-high text-cyan-400 text-xs"></i>
+            <span class="text-slate-300">PID مزدوج: المحور السمتي والارتفاع</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: Kinetic nose -->
+      <div class="glass rounded-2xl p-7 fade-in" style="transition-delay:0.15s">
+        <div class="flex items-center gap-3 mb-5">
+          <div class="icon-ring icon-ring-em">
+            <i class="fa-solid fa-bolt text-emerald-400 text-lg"></i>
+          </div>
+          <h3 class="font-bold text-lg">الأنف المدبب الحركي</h3>
+        </div>
+        <p class="text-slate-400 text-sm leading-relaxed mb-5">
+          الاعتراض بالاصطدام الحركي — بدون متفجرات، بدون شظايا، بدون ضرر جانبي.
+        </p>
+        <div class="space-y-2">
+          <div class="flex items-center gap-2 text-sm">
+            <i class="fa-solid fa-tag text-emerald-400 text-xs"></i>
+            <span class="text-slate-300">التكلفة أقل من <span class="text-emerald-400 font-bold">10,000 ريال</span></span>
+          </div>
+          <div class="flex items-center gap-2 text-sm">
+            <i class="fa-solid fa-tag text-emerald-400 text-xs"></i>
+            <span class="text-slate-300">مواد قياسية، تصنيع محلي</span>
+          </div>
+          <div class="flex items-center gap-2 text-sm">
+            <i class="fa-solid fa-tag text-emerald-400 text-xs"></i>
+            <span class="text-slate-300">آمن فوق المناطق المأهولة</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Second row — 2 cards centered -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-3xl mx-auto">
+
+      <!-- Card 4: Intelligence on ground -->
+      <div class="glass rounded-2xl p-7 fade-in" style="transition-delay:0.2s">
+        <div class="flex items-center gap-3 mb-5">
+          <div class="icon-ring">
+            <i class="fa-solid fa-microchip text-cyan-400 text-lg"></i>
+          </div>
+          <h3 class="font-bold text-lg">الذكاء على الأرض — الجسم رخيص</h3>
+        </div>
+        <p class="text-slate-400 text-sm leading-relaxed mb-5">
+          الذكاء الاصطناعي الثقيل يعمل على محطة الكشف الأرضية، الطائرة تحمل فقط ما يلزم للطيران.
+        </p>
+        <div class="space-y-2">
+          <div class="flex items-center gap-2 text-sm">
+            <i class="fa-solid fa-circle-check text-cyan-400 text-xs"></i>
+            <span class="text-slate-300">Raspberry Pi — أجهزة متوفرة ورخيصة</span>
+          </div>
+          <div class="flex items-center gap-2 text-sm">
+            <i class="fa-solid fa-circle-check text-cyan-400 text-xs"></i>
+            <span class="text-slate-300">ONNX runtime — بدون PyTorch على الطائرة</span>
+          </div>
+          <div class="flex items-center gap-2 text-sm">
+            <i class="fa-solid fa-circle-check text-cyan-400 text-xs"></i>
+            <span class="text-slate-300">نموذج 11.6 MB — يتحمّل ذاكرة Pi</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 5: Second attempt -->
+      <div class="glass rounded-2xl p-7 fade-in" style="transition-delay:0.25s">
+        <div class="flex items-center gap-3 mb-5">
+          <div class="icon-ring">
+            <i class="fa-solid fa-rotate text-cyan-400 text-lg"></i>
+          </div>
+          <h3 class="font-bold text-lg">محاولة ثانية بعد الإخفاق</h3>
+        </div>
+        <p class="text-slate-400 text-sm leading-relaxed mb-5">
+          عند فقدان الهدف لا تُهدر الطائرة — تنتظر 3 ثوانٍ، تلتف 180° وتُعيد الإقفال.
+        </p>
+        <div class="space-y-2">
+          <div class="flex items-center gap-2 text-sm">
+            <i class="fa-solid fa-refresh text-emerald-400 text-xs"></i>
+            <span class="text-slate-300">وضع SEARCHING — 3 ثواني انتظار</span>
+          </div>
+          <div class="flex items-center gap-2 text-sm">
+            <i class="fa-solid fa-refresh text-emerald-400 text-xs"></i>
+            <span class="text-slate-300">العودة للإحداثيات الأخيرة المعروفة</span>
+          </div>
+          <div class="flex items-center gap-2 text-sm">
+            <i class="fa-solid fa-refresh text-emerald-400 text-xs"></i>
+            <span class="text-slate-300">على عكس الصواريخ — قابل للاسترداد</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Anti-jamming highlight -->
+    <div class="mt-12 glass rounded-2xl p-6 sm:p-8 fade-in border-emerald-500/20" style="transition-delay:0.3s; border-color: rgba(16,185,129,0.2);">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-4">
+        <div class="icon-ring icon-ring-em flex-shrink-0">
+          <i class="fa-solid fa-lock text-emerald-400 text-lg"></i>
+        </div>
+        <div>
+          <h3 class="font-bold text-lg text-emerald-400">منيع ضد الحرب الإلكترونية — بالتصميم</h3>
+          <p class="text-slate-400 text-sm">بروتوكول التمييز يستحيل تشويشه لأنه لا يُبث أي إشارة أثناء الطيران</p>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+        <div class="bg-slate-800/50 rounded-lg p-4">
+          <div class="text-emerald-400 font-bold mb-1">لا تشويش</div>
+          <p class="text-slate-400 text-xs">لا إشارة تُرسَل = لا هدف للتشويش. الحرب الإلكترونية تحتاج إشارة لتعطيلها.</p>
+        </div>
+        <div class="bg-slate-800/50 rounded-lg p-4">
+          <div class="text-emerald-400 font-bold mb-1">لا انتحال هوية</div>
+          <p class="text-slate-400 text-xs">بيانات التمييز محملة قبل الإقلاع. الطائرة لا تقبل أي بث خارجي.</p>
+        </div>
+        <div class="bg-slate-800/50 rounded-lg p-4">
+          <div class="text-emerald-400 font-bold mb-1">الرياضيات لا تُخدَع</div>
+          <p class="text-slate-400 text-xs">GPS + بوصلة + الإحداثيات المُودَعة = معادلة تشتغل بلا اتصال خارجي.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-divider"></div>
+
+  <!-- ════════════════════════════════════════════
+       SECTION 5 — STRATEGIC IMPACT
+  ════════════════════════════════════════════ -->
+  <section id="impact" class="py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+
+    <!-- Section header -->
+    <div class="text-center mb-16 fade-in">
+      <p class="text-cyan-500 text-sm font-semibold uppercase tracking-widest mb-3">
+        <i class="fa-solid fa-chess-king mr-1"></i>
+        الأثر الاستراتيجي
+      </p>
+      <h2 class="text-3xl sm:text-4xl md:text-5xl font-black mb-4">
+        <span class="title-underline">لماذا الآن؟ لماذا سعودي؟</span>
+      </h2>
+      <p class="text-slate-400 max-w-2xl mx-auto text-base sm:text-lg">
+        التهديد قائم اليوم — والحل يجب أن يكون سيادياً
+      </p>
+    </div>
+
+    <!-- 3 strategic pillars -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
+
+      <!-- Pillar 1: Economic destruction -->
+      <div class="glass rounded-2xl p-8 text-center fade-in" style="transition-delay:0.05s">
+        <div class="flex justify-center mb-5">
+          <div style="width:4.5rem;height:4.5rem;border-radius:50%;background:rgba(6,182,212,0.1);border:2px solid rgba(6,182,212,0.3);display:flex;align-items:center;justify-content:center;">
+            <i class="fa-solid fa-chart-line text-cyan-400 text-2xl"></i>
+          </div>
+        </div>
+        <h3 class="font-bold text-xl mb-3">سحق اقتصاد العدو</h3>
+        <div class="text-4xl font-black text-cyan-400 mb-1">99%</div>
+        <div class="text-slate-400 text-sm mb-4">تخفيض في تكلفة الاعتراض</div>
+        <p class="text-slate-400 text-sm leading-relaxed">
+          عشرات الاعتراضات بسعر صاروخ واحد. العدو يُنفق 20 ألفاً، أنت تُعترض بأقل من ذلك بكثير — المعادلة انقلبت.
+        </p>
+      </div>
+
+      <!-- Pillar 2: Infrastructure protection -->
+      <div class="glass rounded-2xl p-8 text-center fade-in" style="transition-delay:0.1s">
+        <div class="flex justify-center mb-5">
+          <div style="width:4.5rem;height:4.5rem;border-radius:50%;background:rgba(16,185,129,0.1);border:2px solid rgba(16,185,129,0.3);display:flex;align-items:center;justify-content:center;">
+            <i class="fa-solid fa-shield-halved text-emerald-400 text-2xl"></i>
+          </div>
+        </div>
+        <h3 class="font-bold text-xl mb-3">حماية البنية التحتية الحيوية</h3>
+        <div class="text-4xl font-black text-emerald-400 mb-1">24/7</div>
+        <div class="text-slate-400 text-sm mb-4">حراسة ذاتية مستمرة</div>
+        <p class="text-slate-400 text-sm leading-relaxed">
+          أرامكو، موانئ الملك عبدالله، حدود الشمال، المطارات الدولية — كل منشأة حيوية تستحق طبقة دفاع منخفضة الارتفاع.
+        </p>
+      </div>
+
+      <!-- Pillar 3: Industrial sovereignty -->
+      <div class="glass rounded-2xl p-8 text-center fade-in" style="transition-delay:0.15s">
+        <div class="flex justify-center mb-5">
+          <div style="width:4.5rem;height:4.5rem;border-radius:50%;background:rgba(168,85,247,0.1);border:2px solid rgba(168,85,247,0.3);display:flex;align-items:center;justify-content:center;">
+            <i class="fa-solid fa-industry text-purple-400 text-2xl"></i>
+          </div>
+        </div>
+        <h3 class="font-bold text-xl mb-3">السيادة الصناعية السعودية</h3>
+        <div class="text-4xl font-black" style="color:#a855f7">100%</div>
+        <div class="text-slate-400 text-sm mb-4">تصنيع وتطوير محلي</div>
+        <p class="text-slate-400 text-sm leading-relaxed">
+          كود مفتوح، خوارزمية سعودية، تصنيع داخل المملكة. لا اعتمادية على موردين خارجيين — رؤية 2030 في صيغتها الدفاعية.
+        </p>
+      </div>
+    </div>
+
+    <!-- Comparison table -->
+    <div class="glass rounded-2xl p-6 sm:p-8 fade-in" style="transition-delay:0.2s">
+      <h3 class="text-center font-bold text-xl mb-8 text-slate-200">مقارنة المنظومات — اقتصاد الاعتراض</h3>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm" style="border-collapse:separate;border-spacing:0">
+          <thead>
+            <tr class="text-xs text-slate-500 uppercase tracking-wider">
+              <th class="text-right pb-3 pl-4">الميزة</th>
+              <th class="text-center pb-3 px-4">صاروخ باتريوت</th>
+              <th class="text-center pb-3 px-4">سهم</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="border-t border-slate-700/50">
+              <td class="py-3.5 pl-4 text-slate-300">التكلفة للاعتراض</td>
+              <td class="py-3.5 px-4 text-center text-red-400 font-bold">$3,000,000</td>
+              <td class="py-3.5 px-4 text-center text-emerald-400 font-bold">&lt; $2,700</td>
+            </tr>
+            <tr class="border-t border-slate-700/50">
+              <td class="py-3.5 pl-4 text-slate-300">الحد الأدنى للارتفاع</td>
+              <td class="py-3.5 px-4 text-center text-red-400">+150 متر</td>
+              <td class="py-3.5 px-4 text-center text-emerald-400">1 متر</td>
+            </tr>
+            <tr class="border-t border-slate-700/50">
+              <td class="py-3.5 pl-4 text-slate-300">المناعة من التشويش</td>
+              <td class="py-3.5 px-4 text-center text-yellow-400">جزئياً</td>
+              <td class="py-3.5 px-4 text-center text-emerald-400">كاملة (لا إشارة)</td>
+            </tr>
+            <tr class="border-t border-slate-700/50">
+              <td class="py-3.5 pl-4 text-slate-300">التصنيع المحلي</td>
+              <td class="py-3.5 px-4 text-center text-red-400">مستورد</td>
+              <td class="py-3.5 px-4 text-center text-emerald-400">100% سعودي</td>
+            </tr>
+            <tr class="border-t border-slate-700/50">
+              <td class="py-3.5 pl-4 text-slate-300">الاسترداد بعد الإخفاق</td>
+              <td class="py-3.5 px-4 text-center text-red-400">مستحيل</td>
+              <td class="py-3.5 px-4 text-center text-emerald-400">يُعيد المحاولة</td>
+            </tr>
+            <tr class="border-t border-slate-700/50">
+              <td class="py-3.5 pl-4 text-slate-300">القرار المستقل</td>
+              <td class="py-3.5 px-4 text-center text-yellow-400">يحتاج مشغّلاً</td>
+              <td class="py-3.5 px-4 text-center text-emerald-400">ذاتي بالكامل</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-divider"></div>
+
+  <!-- ════════════════════════════════════════════
+       SECTION 6 — FOOTER / CTA
+  ════════════════════════════════════════════ -->
+  <section id="contact" class="py-24 px-4 sm:px-6 lg:px-8 relative" style="border-top:2px solid rgba(6,182,212,0.4);">
+
+    <!-- Background glow -->
+    <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%, rgba(6,182,212,0.05) 0%, transparent 60%);pointer-events:none;"></div>
+
+    <div class="max-w-4xl mx-auto text-center relative z-10">
+
+      <!-- Status indicator -->
+      <div class="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/25 rounded-full px-5 py-2 mb-8 fade-in">
+        <span class="blink text-emerald-400 text-xs"><i class="fa-solid fa-circle"></i></span>
+        <span class="text-emerald-400 text-sm font-semibold">النظام جاهز للتطوير الصناعي</span>
+      </div>
+
+      <h2 class="text-3xl sm:text-4xl md:text-5xl font-black mb-5 fade-in" style="transition-delay:0.05s">
+        نبحث عن<br><span class="text-cyan-400">شركاء استراتيجيين</span>
+      </h2>
+
+      <p class="text-slate-400 text-base sm:text-lg max-w-2xl mx-auto mb-12 fade-in" style="transition-delay:0.1s">
+        المنظومة محققة ومختبرة — نسعى إلى تسريع الوصول إلى الإنتاج بشراكة مع الجهات الحكومية والصناعية السعودية
+      </p>
+
+      <!-- Partners -->
+      <div class="mb-12 fade-in" style="transition-delay:0.15s">
+        <p class="text-xs text-slate-600 uppercase tracking-widest mb-5">شركاء التطوير المستهدفون</p>
+        <div class="flex flex-wrap justify-center gap-3">
+          <span class="partner-badge">NCMS — المركز الوطني للأرصاد</span>
+          <span class="partner-badge">أكاديمية طويق</span>
+          <span class="partner-badge">GADD — الجهاز العام للدفاع</span>
+          <span class="partner-badge">وزارة التعليم</span>
+          <span class="partner-badge">رؤية 2030</span>
+        </div>
+      </div>
+
+      <!-- Contact CTA -->
+      <div class="glass rounded-2xl p-8 sm:p-10 max-w-lg mx-auto fade-in" style="transition-delay:0.2s">
+        <div class="icon-ring mx-auto mb-4" style="width:3.5rem;height:3.5rem;">
+          <i class="fa-solid fa-envelope text-cyan-400 text-lg"></i>
+        </div>
+        <h3 class="font-bold text-xl mb-2">تواصل مع الفريق</h3>
+        <p class="text-slate-400 text-sm mb-5">لعروض الشراكة، التجارب الميدانية، والتعاقدات الحكومية</p>
+        <a href="mailto:info@zarqaa-sahm.sa"
+           class="block w-full bg-cyan-500/15 border border-cyan-500/40 hover:border-cyan-400 hover:bg-cyan-500/25 text-cyan-300 font-bold py-3.5 rounded-lg transition-all text-base">
+          info@zarqaa-sahm.sa
+        </a>
+      </div>
+
+      <!-- Tech stack badges -->
+      <div class="mt-12 flex flex-wrap justify-center gap-2 text-xs fade-in" style="transition-delay:0.25s">
+        <span class="bg-slate-800/80 border border-slate-700 rounded-full px-3 py-1 text-slate-400">YOLOv8n ONNX</span>
+        <span class="bg-slate-800/80 border border-slate-700 rounded-full px-3 py-1 text-slate-400">MobileNetV2</span>
+        <span class="bg-slate-800/80 border border-slate-700 rounded-full px-3 py-1 text-slate-400">Raspberry Pi</span>
+        <span class="bg-slate-800/80 border border-slate-700 rounded-full px-3 py-1 text-slate-400">Pixhawk</span>
+        <span class="bg-slate-800/80 border border-slate-700 rounded-full px-3 py-1 text-slate-400">Edge AI</span>
+        <span class="bg-slate-800/80 border border-slate-700 rounded-full px-3 py-1 text-slate-400">GPS + Haversine</span>
+        <span class="bg-slate-800/80 border border-slate-700 rounded-full px-3 py-1 text-slate-400">Laser Rangefinder</span>
+        <span class="bg-slate-800/80 border border-slate-700 rounded-full px-3 py-1 text-slate-400">PID Control</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Footer bar ── -->
+  <footer class="py-5 px-4 border-t border-slate-800/60 text-center">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
+      <span>منظومة زرقاء اليمامة وسهم — صنع سعودي، دفاع سيادي</span>
+      <span class="text-slate-700">
+        <i class="fa-regular fa-copyright ml-1"></i>
+        2025 جميع الحقوق محفوظة
+      </span>
+      <div class="flex items-center gap-1">
+        <span class="blink text-emerald-500 text-xs"><i class="fa-solid fa-circle"></i></span>
+        <span class="text-emerald-600">LIVE SYSTEM — مُشغَّل</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ════════════════════════════════════════════
+       JAVASCRIPT
+  ════════════════════════════════════════════ -->
+  <script>
+    // ── Intersection Observer — fade-in on scroll ──
+    const observerOptions = { threshold: 0.1, rootMargin: '0px 0px -40px 0px' };
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target); // fire once
+        }
+      });
+    }, observerOptions);
+
+    document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+
+    // ── Smooth scroll for CTA ──
+    const ctaBtn = document.querySelector('#cta-btn');
+    if (ctaBtn) {
+      ctaBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const target = document.querySelector('#problem');
+        if (target) target.scrollIntoView({ behavior: 'smooth' });
+      });
+    }
+
+    // ── Navbar scroll highlight ──
+    const sections = document.querySelectorAll('section[id]');
+    const navLinks = document.querySelectorAll('nav a[href^="#"]');
+
+    function highlightNav() {
+      let current = '';
+      sections.forEach(sec => {
+        const top = sec.offsetTop - 80;
+        if (window.scrollY >= top) current = sec.id;
+      });
+      navLinks.forEach(link => {
+        link.classList.remove('text-cyan-400');
+        link.classList.add('text-slate-400');
+        if (link.getAttribute('href') === '#' + current) {
+          link.classList.add('text-cyan-400');
+          link.classList.remove('text-slate-400');
+        }
+      });
+    }
+
+    window.addEventListener('scroll', highlightNav, { passive: true });
+    highlightNav();
+
+    // ── Trigger hero fade-ins immediately ──
+    document.querySelectorAll('section:first-of-type .fade-in').forEach(el => {
+      el.classList.add('visible');
+    });
+  </script>
+
+</body>
+</html>
